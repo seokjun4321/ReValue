@@ -88,7 +88,7 @@ export default function Index() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       // 로그인 성공 시
       Alert.alert("로그인 성공!", `${userCredential.user.email}님 환영합니다!`);
-      router.replace('./home'); // 로그인 후 맵 화면으로 이동
+      router.replace('/(tabs)/home'); // 로그인 후 탭 화면으로 이동
     } catch (error: any) { // 에러 타입 명시
       // 로그인 실패 시
       let errorMessage = "로그인에 실패했습니다. 다시 시도해주세요.";
@@ -130,7 +130,7 @@ export default function Index() {
       Alert.alert("회원가입 성공!", `${nickname}님 환영합니다! 계정이 생성 되었습니다.`);
       // 회원가입 성공 후 로그인 화면으로 전환하거나, 바로 로그인 상태로 전환할 수 있습니다.
       // 여기서는 바로 로그인 상태가 되므로, 홈으로 이동시킵니다.
-      router.replace('./home');
+      router.replace('/(tabs)/home');
     } catch (error: any) { // 에러 타입 명시
       // 회원가입 실패 시
       let errorMessage = "회원가입에 실패했습니다. 다시 시도해주세요.";
