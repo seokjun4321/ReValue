@@ -65,17 +65,30 @@ export default function Profile() {
             </View>
           </TouchableOpacity>
 
-          {/* 판매자 전환 버튼 */}
-          <TouchableOpacity 
-            style={styles.sellerModeButton}
-            onPress={() => router.push('/seller/upload')}
-          >
-            <View style={styles.menuContent}>
-              <Ionicons name="storefront" size={24} color="#3b82f6" />
-              <Text style={styles.sellerModeText}>판매자 전환</Text>
-              <Ionicons name="chevron-forward" size={20} color="#3b82f6" />
-            </View>
-          </TouchableOpacity>
+          {/* 판매자 모드 버튼들 */}
+          <View style={styles.sellerSection}>
+            <TouchableOpacity 
+              style={styles.sellerModeButton}
+              onPress={() => router.push('/seller/dashboard')}
+            >
+              <View style={styles.menuContent}>
+                <Ionicons name="analytics" size={24} color="#3b82f6" />
+                <Text style={styles.sellerModeText}>판매자 대시보드</Text>
+                <Ionicons name="chevron-forward" size={20} color="#3b82f6" />
+              </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.sellerUploadButton}
+              onPress={() => router.push('/seller/upload')}
+            >
+              <View style={styles.menuContent}>
+                <Ionicons name="add-circle" size={24} color="#22c55e" />
+                <Text style={styles.sellerUploadText}>떨이 등록</Text>
+                <Ionicons name="chevron-forward" size={20} color="#22c55e" />
+              </View>
+            </TouchableOpacity>
+          </View>
 
           <TouchableOpacity style={styles.menuItem}>
             <View style={styles.menuContent}>
@@ -223,15 +236,35 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   
-  // 판매자 전환 버튼
+  // 판매자 섹션
+  sellerSection: {
+    marginBottom: 24,
+  },
   sellerModeButton: {
     backgroundColor: '#eff6ff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#3b82f6',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#3b82f6',
   },
   sellerModeText: {
     fontSize: 16,
     color: '#1e40af',
+    flex: 1,
+    marginLeft: 12,
+    fontWeight: 'bold',
+  },
+  sellerUploadButton: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#22c55e',
+  },
+  sellerUploadText: {
+    fontSize: 16,
+    color: '#166534',
     flex: 1,
     marginLeft: 12,
     fontWeight: 'bold',

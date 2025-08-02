@@ -1,244 +1,439 @@
-/*
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Alert, 
+  Platform,
+  ActivityIndicator 
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, Image, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../firebase';
+import { signInWithGoogle, configureGoogleSignIn } from '../lib/socialAuth';
+import { createOrUpdateUserProfile } from '../lib/firestore';
 import "./global.css";
 
-  export default function Index() {
-    const router = useRouter();
-    const [username, setUsername] = useState('');
-    const [password, setPassword] = useState('');
-
-    const handleLogin = () => {
-      if (username === 'admin' && password === '1234') {
-        Alert.alert("로그인 성공!", "메인 화면으로 이동합니다.");
-        router.replace('/home'); // 로그인 후 뒤로 가기 방지를 위해 replace 사용
-      } else {
-        Alert.alert("로그인 실패", "아이디 또는 비밀번호를 확인해주세요.");
-      }
-    };
-
-    return (
-      <View className="flex-1 items-center justify-center bg-green-100">
-        <Text className="text-5xl text-center font-bold text-yellow-100 mb-5">
-          Re:Value에 오신것을 환영합니다!
-        </Text>
-        <Text className='text-4xl text-center font-semibold text-yellow-100 mb-2'>
-          로그인을 해볼까요?
-        </Text>
-        <Image className="mb-2"
-            source={require('../assets/images/logo.png')}
-            style={{width: 200, height: 200}}
-          />
-        <TextInput className='font-bold text-yellow-100 text-center px-6 mb-2'
-          style={{
-            height: 40,
-            width : 150,
-            borderColor: 'yellow',
-            borderWidth: 1,
-          }}
-          placeholder="Username"
-          placeholderTextColor="yellow"
-          onChangeText={setUsername}
-          value={username}
-        />
-        <TextInput className='font-bold text-yellow-100 text-center px-7 mb-4'
-          style={{
-            height: 40,
-            width : 150,
-            borderColor: 'yellow',
-            borderWidth: 1,
-          }}
-          placeholder="Password"
-          placeholderTextColor="yellow"
-          onChangeText={setPassword}
-          value={password}
-        />
-        <TouchableOpacity
-          className="bg-yellow-300 py-3 px-10 rounded-full shadow-lg"
-          onPress={handleLogin}>
-          <Text className='font-bold text-green-800 text-center text-lg'>
-            Login
-          </Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-*/
-import { useRouter } from 'expo-router';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'; // Firebase 인증 함수 임포트
-import { doc, serverTimestamp, setDoc } from 'firebase/firestore';
-import React, { useState } from 'react';
-import { Alert, Image, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { auth, db } from '../firebase.js'; // <--- firebase.js 파일에서 auth 객체를 가져옵니다.
-import "./global.css";
-
-export default function Index() {
+export default function LoginScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState(''); // username 대신 email 사용 (Firebase Auth는 이메일을 주로 사용)
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [nickname, setNickname] = useState('');
-  const [isConsumer, setIsConsumer] = useState(true);
-  const [isRegistering, setIsRegistering] = useState(false); // 회원가입/로그인 토글을 위한 상태
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
 
-  // 로그인 처리 함수
-  const handleLogin = async () => {
+  useEffect(() => {
+    // Google 소셜 로그인 초기화
+    if (Platform.OS !== 'web') {
+      configureGoogleSignIn();
+    }
+  }, []);
+
+  const handleEmailLogin = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('입력 오류', '이메일과 비밀번호를 입력해주세요.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      // Firebase signInWithEmailAndPassword 함수 사용
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      // 로그인 성공 시
-      Alert.alert("로그인 성공!", `${userCredential.user.email}님 환영합니다!`);
-      router.replace('/(tabs)/home'); // 로그인 후 탭 화면으로 이동
-    } catch (error: any) { // 에러 타입 명시
-      // 로그인 실패 시
-      let errorMessage = "로그인에 실패했습니다. 다시 시도해주세요.";
-      if (error.code === 'auth/invalid-email') {
-        errorMessage = "유효하지 않은 이메일 형식입니다.";
-      } else if (error.code === 'auth/user-disabled') {
-        errorMessage = "비활성화된 사용자 계정입니다.";
-      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        errorMessage = "이메일 또는 비밀번호가 잘못되었습니다.";
-      } else if (error.code === 'auth/invalid-credential') { // 최신 버전 Firebase SDK에서 사용
-        errorMessage = "잘못된 자격 증명입니다. 이메일 또는 비밀번호를 확인해주세요.";
+      const user = userCredential.user;
+      
+      console.log('로그인 성공:', user.email);
+      router.replace('/(tabs)/home');
+    } catch (error: any) {
+      console.error('로그인 실패:', error);
+      let errorMessage = '로그인에 실패했습니다.';
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = '존재하지 않는 계정입니다.';
+      } else if (error.code === 'auth/wrong-password') {
+        errorMessage = '비밀번호가 올바르지 않습니다.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = '유효하지 않은 이메일 형식입니다.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = '네트워크 연결을 확인해주세요.';
       }
-      Alert.alert("로그인 실패", errorMessage);
-      console.error("로그인 에러:", error.code, error.message);
+      
+      Alert.alert('로그인 실패', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 회원가입 처리 함수
-  const handleRegister = async () => {
-    if(!nickname){
-      Alert.alert("입력 오류", "닉네임을 입력해주세요.");
+  const handleEmailRegister = async () => {
+    if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
+      Alert.alert('입력 오류', '모든 필드를 입력해주세요.');
       return;
     }
+
+    if (password !== confirmPassword) {
+      Alert.alert('입력 오류', '비밀번호가 일치하지 않습니다.');
+      return;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('입력 오류', '비밀번호는 6자 이상이어야 합니다.');
+      return;
+    }
+
+    setLoading(true);
     try {
-      // 1. Firebase Authentication으로 회원가입
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
-      // 2. Firestore에 사용자 추가 정보 저장
-      // 'users' 컬렉션에 문서 ID를 사용자의 UID로 하여 문서 생성/업데이트
-      await setDoc(doc(db, 'users', user.uid), {
-        email: user.email,
-        nickname: nickname,
-        consumer: isConsumer,
-        registeredAt: serverTimestamp(), // 가입 시간 타임스탬프
-        // 필요하다면 추가 정보 (profileImageUrl, address 등)
+      
+      // 사용자 프로필 생성
+      await createOrUpdateUserProfile(user.uid, {
+        email: user.email || '',
+        displayName: user.displayName || '',
+        userType: 'buyer',
+        notificationSettings: {
+          newDealsNearby: true,
+          favoriteStoreUpdates: true,
+          expiryAlerts: true,
+          priceDrops: true
+        }
       });
-      // 회원가입 성공 시
-      Alert.alert("회원가입 성공!", `${nickname}님 환영합니다! 계정이 생성 되었습니다.`);
-      // 회원가입 성공 후 로그인 화면으로 전환하거나, 바로 로그인 상태로 전환할 수 있습니다.
-      // 여기서는 바로 로그인 상태가 되므로, 홈으로 이동시킵니다.
-      router.replace('/(tabs)/home');
-    } catch (error: any) { // 에러 타입 명시
-      // 회원가입 실패 시
-      let errorMessage = "회원가입에 실패했습니다. 다시 시도해주세요.";
+      
+      console.log('회원가입 성공:', user.email);
+      Alert.alert('회원가입 성공', '계정이 생성되었습니다!', [
+        { text: '확인', onPress: () => router.replace('/(tabs)/home') }
+      ]);
+    } catch (error: any) {
+      console.error('회원가입 실패:', error);
+      let errorMessage = '회원가입에 실패했습니다.';
+      
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "이미 사용 중인 이메일 주소입니다.";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = "비밀번호는 6자 이상이어야 합니다.";
+        errorMessage = '이미 사용 중인 이메일입니다.';
       } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "유효하지 않은 이메일 형식입니다.";
+        errorMessage = '유효하지 않은 이메일 형식입니다.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = '비밀번호가 너무 약합니다.';
       }
-      Alert.alert("회원가입 실패", errorMessage);
-      console.error("회원가입 에러:", error.code, error.message);
+      
+      Alert.alert('회원가입 실패', errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setSocialLoading(true);
+    try {
+      const result = await signInWithGoogle();
+      if (result.success) {
+        console.log('Google 로그인 성공');
+        router.replace('/(tabs)/home');
+      } else {
+        Alert.alert('로그인 실패', result.error || 'Google 로그인에 실패했습니다.');
+      }
+    } catch (error) {
+      console.error('Google 로그인 오류:', error);
+      Alert.alert('로그인 실패', 'Google 로그인 중 오류가 발생했습니다.');
+    } finally {
+      setSocialLoading(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={{flex: 1}}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      <ScrollView
-        contentContainerStyle={{flexGrow:1}}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="flex-1 items-center justify-center bg-green-100">
-          <Text className="text-5xl text-center font-bold text-yellow-100 mb-5">
-            Re:Value에 오신것을 환영합니다!
-          </Text>
-          <Text className='text-4xl text-center font-semibold text-yellow-100 mb-2'>
-            {isRegistering ? '회원가입을 해볼까요?' : '로그인을 해볼까요?'}
-          </Text>
-          <Image
-            source={require('../assets/images/logo.png')}
-            style={{ width: 200, height: 200 }}
-          />
-          {isRegistering && ( // <--- 회원가입 모드일 때 소비자인지 판매자인지
-            <TouchableOpacity
-              className="bg-yellow-100 py-2 px-10 rounded-full shadow-lg mb-4"
-              onPress={() => setIsConsumer(!isConsumer)}>
-              <Text className='font-bold text-green-800 text-center text-base'>
-                {isConsumer ? '소비자' : '판매자'}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {isRegistering && ( // <--- 회원가입 모드일 때만 닉네임 입력 필드 표시
+    <View style={styles.container}>
+      {/* 헤더 */}
+      <View style={styles.header}>
+        <Text style={styles.logo}>ReValue</Text>
+        <Text style={styles.subtitle}>지구를 지키는 떨이 플랫폼</Text>
+      </View>
+
+      {/* 로그인/회원가입 폼 */}
+      <View style={styles.formContainer}>
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, isLogin && styles.activeTab]}
+            onPress={() => setIsLogin(true)}
+          >
+            <Text style={[styles.tabText, isLogin && styles.activeTabText]}>로그인</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, !isLogin && styles.activeTab]}
+            onPress={() => setIsLogin(false)}
+          >
+            <Text style={[styles.tabText, !isLogin && styles.activeTabText]}>회원가입</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="mail" size={20} color="#22c55e" style={styles.inputIcon} />
             <TextInput
-              className='font-bold text-yellow-100 text-center px-6 mb-2'
-              style={{
-                height: 40,
-                width: 250,
-                borderColor: 'yellow',
-                borderWidth: 1,
-              }}
-              placeholder="닉네임 (Nickname)"
-              placeholderTextColor="yellow"
-              onChangeText={setNickname}
-              value={nickname}
+              style={styles.input}
+              placeholder="이메일"
+              placeholderTextColor="#9ca3af"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
               autoCapitalize="none"
             />
+          </View>
+
+          <View style={styles.inputWrapper}>
+            <Ionicons name="lock-closed" size={20} color="#22c55e" style={styles.inputIcon} />
+            <TextInput
+              style={styles.input}
+              placeholder="비밀번호"
+              placeholderTextColor="#9ca3af"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
+
+          {!isLogin && (
+            <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed" size={20} color="#22c55e" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="비밀번호 확인"
+                placeholderTextColor="#9ca3af"
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+              />
+            </View>
           )}
-          <TextInput
-            className='font-bold text-yellow-100 text-center px-6 mb-2'
-            style={{
-              height: 40,
-              width: 250, // 너비 조절, 이메일 주소가 길어질 수 있으니
-              borderColor: 'yellow',
-              borderWidth: 1,
-            }}
-            placeholder="이메일 (Email)" // 이메일 입력으로 변경
-            placeholderTextColor="yellow"
-            onChangeText={setEmail}
-            value={email}
-            keyboardType="email-address" // 이메일 입력에 적합한 키보드 타입
-            autoCapitalize="none" // 자동 대문자 방지
-          />
-          <TextInput
-            className='font-bold text-yellow-100 text-center px-7 mb-4'
-            style={{
-              height: 40,
-              width: 250, // 너비 조절
-              borderColor: 'yellow',
-              borderWidth: 1,
-            }}
-            placeholder="비밀번호 (Password)" // 비밀번호 입력으로 변경
-            placeholderTextColor="yellow"
-            onChangeText={setPassword}
-            value={password}
-            secureTextEntry // 비밀번호 숨김
-          />
-          <TouchableOpacity
-            className="bg-yellow-300 py-3 px-10 rounded-full shadow-lg mb-4" // 마진 추가
-            onPress={isRegistering ? handleRegister : handleLogin} // 상태에 따라 함수 호출
-          >
-            <Text className='font-bold text-green-800 text-center text-lg'>
-              {isRegistering ? '회원가입' : '로그인'}
+        </View>
+
+        {/* 이메일 로그인/회원가입 버튼 */}
+        <TouchableOpacity
+          style={[styles.primaryButton, loading && styles.disabledButton]}
+          onPress={isLogin ? handleEmailLogin : handleEmailRegister}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.primaryButtonText}>
+              {isLogin ? '로그인' : '회원가입'}
             </Text>
+          )}
+        </TouchableOpacity>
+
+        {/* 구분선 */}
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>또는</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* 소셜 로그인 버튼들 */}
+        <View style={styles.socialContainer}>
+          <TouchableOpacity
+            style={[styles.socialButton, styles.googleButton]}
+            onPress={handleGoogleLogin}
+            disabled={socialLoading}
+          >
+            {socialLoading ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#ffffff" />
+                <Text style={styles.socialButtonText}>Google로 계속하기</Text>
+              </>
+            )}
           </TouchableOpacity>
 
-          {/* 로그인/회원가입 전환 버튼 */}
-          <TouchableOpacity onPress={() => setIsRegistering(!isRegistering)}>
-            <Text className='font-bold text-yellow-100 text-center text-base'>
-              {isRegistering ? '이미 계정이 있으신가요? 로그인' : '계정이 없으신가요? 회원가입'}
+          <TouchableOpacity
+            style={[styles.socialButton, styles.appleButton]}
+            disabled
+          >
+            <Ionicons name="logo-apple" size={20} color="#ffffff" />
+            <Text style={styles.socialButtonText}>Apple로 계속하기 (준비중)</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.socialButton, styles.kakaoButton]}
+            disabled
+          >
+            <Text style={[styles.socialButtonText, { color: '#3c1e1e' }]}>
+              카카오로 계속하기 (준비중)
             </Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+
+        {/* 약관 동의 텍스트 */}
+        {!isLogin && (
+          <Text style={styles.termsText}>
+            회원가입 시 <Text style={styles.linkText}>이용약관</Text>과{' '}
+            <Text style={styles.linkText}>개인정보처리방침</Text>에 동의하게 됩니다.
+          </Text>
+        )}
+      </View>
+
+      {/* 하단 링크 */}
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          {isLogin ? '계정이 없으신가요? ' : '이미 계정이 있으신가요? '}
+          <Text
+            style={styles.linkText}
+            onPress={() => setIsLogin(!isLogin)}
+          >
+            {isLogin ? '회원가입' : '로그인'}
+          </Text>
+        </Text>
+      </View>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#22c55e',
+  },
+  header: {
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 80 : 60,
+    paddingBottom: 40,
+  },
+  logo: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#dcfce7',
+  },
+  formContainer: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 32,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  activeTab: {
+    backgroundColor: '#22c55e',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#16a34a',
+  },
+  activeTabText: {
+    color: '#ffffff',
+  },
+  inputContainer: {
+    marginBottom: 24,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fdf8',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dcfce7',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: '#166534',
+  },
+  primaryButton: {
+    backgroundColor: '#22c55e',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  disabledButton: {
+    backgroundColor: '#9ca3af',
+  },
+  primaryButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#ffffff',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e5e7eb',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    color: '#9ca3af',
+    fontSize: 14,
+  },
+  socialContainer: {
+    marginBottom: 24,
+  },
+  socialButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  googleButton: {
+    backgroundColor: '#4285f4',
+  },
+  appleButton: {
+    backgroundColor: '#000000',
+  },
+  kakaoButton: {
+    backgroundColor: '#fee500',
+  },
+  socialButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+    marginLeft: 8,
+  },
+  termsText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  linkText: {
+    color: '#22c55e',
+    fontWeight: '600',
+  },
+  footer: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#dcfce7',
+  },
+});

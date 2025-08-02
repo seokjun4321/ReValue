@@ -11,7 +11,14 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { getActiveDeals, getDealsByCategory, getOrdersByBuyer } from '../../lib/firestore';
+import { 
+  getActiveDeals, 
+  getDealsByCategory, 
+  getOrdersByBuyer, 
+  getPopularDeals,
+  getExpiringDeals,
+  getUserStats 
+} from '../../lib/firestore';
 import { Deal, Order, CategoryType, CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS } from '../../lib/types';
 import { auth } from '../../firebase';
 import "../global.css";
@@ -19,7 +26,10 @@ import "../global.css";
 export default function Home() {
   const router = useRouter();
   const [todaysDeals, setTodaysDeals] = useState<Deal[]>([]);
+  const [popularDeals, setPopularDeals] = useState<Deal[]>([]);
+  const [expiringDeals, setExpiringDeals] = useState<Deal[]>([]);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
+  const [userStats, setUserStats] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -28,14 +38,28 @@ export default function Home() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const deals = await getActiveDeals(10);
+      
+      // 병렬로 여러 데이터 로드
+      const [deals, popular, expiring] = await Promise.all([
+        getActiveDeals(10),
+        getPopularDeals(5),
+        getExpiringDeals(5)
+      ]);
+      
       setTodaysDeals(deals);
+      setPopularDeals(popular);
+      setExpiringDeals(expiring);
 
-      // 사용자가 로그인되어 있으면 주문 내역 로드
+      // 사용자가 로그인되어 있으면 주문 내역과 통계 로드
       const user = auth.currentUser;
       if (user) {
-        const orders = await getOrdersByBuyer(user.uid);
+        const [orders, stats] = await Promise.all([
+          getOrdersByBuyer(user.uid),
+          getUserStats(user.uid)
+        ]);
+        
         setRecentOrders(orders.slice(0, 3)); // 최근 3개만
+        setUserStats(stats);
       }
     } catch (error) {
       console.error('데이터 로드 실패:', error);

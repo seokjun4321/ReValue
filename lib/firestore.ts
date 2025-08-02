@@ -354,3 +354,204 @@ export const timestampToDate = (timestamp: any): Date | undefined => {
   if (timestamp.seconds) return new Date(timestamp.seconds * 1000);
   return undefined;
 };
+
+// ===== 고급 쿼리 함수들 =====
+
+/**
+ * 위치 기반 떨이 검색 (거리 필터링)
+ */
+export const getNearbyDeals = async (
+  userLat: number,
+  userLon: number,
+  radiusKm: number = 5,
+  limitCount: number = 20
+): Promise<Deal[]> => {
+  try {
+    // 간단한 바운딩 박스 계산 (정확하지는 않지만 빠름)
+    const latDelta = radiusKm / 111; // 1도 ≈ 111km
+    const lonDelta = radiusKm / (111 * Math.cos(userLat * Math.PI / 180));
+    
+    const q = query(
+      collection(db, collections.deals),
+      where('status', '==', 'active'),
+      limit(limitCount * 3) // 필터링을 위해 더 많이 가져옴
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const now = new Date();
+    
+    // 클라이언트에서 거리 필터링
+    const nearbyDeals = querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        expiryDate: doc.data().expiryDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate()
+      }) as Deal)
+      .filter(deal => {
+        if (deal.remainingQuantity <= 0 || !deal.expiryDate || deal.expiryDate <= now) {
+          return false;
+        }
+        
+        const distance = calculateDistance(
+          userLat, userLon,
+          deal.location.latitude, deal.location.longitude
+        );
+        return distance <= radiusKm;
+      })
+      .sort((a, b) => {
+        // 거리순 정렬
+        const distA = calculateDistance(userLat, userLon, a.location.latitude, a.location.longitude);
+        const distB = calculateDistance(userLat, userLon, b.location.latitude, b.location.longitude);
+        return distA - distB;
+      })
+      .slice(0, limitCount);
+    
+    return nearbyDeals;
+  } catch (error) {
+    console.error('Error getting nearby deals:', error);
+    return [];
+  }
+};
+
+/**
+ * 매장별 떨이 통계 집계
+ */
+export const getStoreStats = async (storeId: string) => {
+  try {
+    const [dealsQuery, ordersQuery] = await Promise.all([
+      getDocs(query(collection(db, collections.deals), where('storeId', '==', storeId))),
+      getDocs(query(collection(db, collections.orders), where('storeId', '==', storeId)))
+    ]);
+    
+    const deals = dealsQuery.docs.map(doc => doc.data());
+    const orders = ordersQuery.docs.map(doc => doc.data());
+    
+    const stats = {
+      totalDeals: deals.length,
+      activeDeals: deals.filter(deal => deal.status === 'active').length,
+      totalOrders: orders.length,
+      completedOrders: orders.filter(order => order.status === 'completed').length,
+      totalRevenue: orders
+        .filter(order => order.status === 'completed')
+        .reduce((sum, order) => sum + order.totalPrice, 0),
+      averageDiscount: deals.length > 0 
+        ? deals.reduce((sum, deal) => sum + deal.discountRate, 0) / deals.length 
+        : 0
+    };
+    
+    return stats;
+  } catch (error) {
+    console.error('Error getting store stats:', error);
+    return null;
+  }
+};
+
+/**
+ * 사용자 구매 통계
+ */
+export const getUserStats = async (userId: string) => {
+  try {
+    const ordersQuery = await getDocs(
+      query(collection(db, collections.orders), where('buyerId', '==', userId))
+    );
+    
+    const orders = ordersQuery.docs.map(doc => ({
+      ...doc.data(),
+      orderedAt: doc.data().orderedAt?.toDate()
+    }));
+    
+    const completedOrders = orders.filter(order => order.status === 'completed');
+    
+    const stats = {
+      totalOrders: orders.length,
+      completedOrders: completedOrders.length,
+      totalSpent: completedOrders.reduce((sum, order) => sum + order.totalPrice, 0),
+      totalSaved: completedOrders.reduce((sum, order) => sum + order.savedAmount, 0),
+      co2Saved: completedOrders.length * 0.25, // kg, 대략적인 계산
+      ecoLevel: Math.floor(completedOrders.length / 10) + 1 // 10건당 레벨업
+    };
+    
+    return stats;
+  } catch (error) {
+    console.error('Error getting user stats:', error);
+    return null;
+  }
+};
+
+/**
+ * 인기 떨이 (주문 수 기준)
+ */
+export const getPopularDeals = async (limitCount: number = 10): Promise<Deal[]> => {
+  try {
+    const q = query(
+      collection(db, collections.deals),
+      where('status', '==', 'active'),
+      limit(limitCount * 2)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const now = new Date();
+    
+    const popularDeals = querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        expiryDate: doc.data().expiryDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate()
+      }) as Deal)
+      .filter(deal => 
+        deal.remainingQuantity > 0 && 
+        deal.expiryDate && 
+        deal.expiryDate > now
+      )
+      .sort((a, b) => b.orderCount - a.orderCount) // 주문 수 내림차순
+      .slice(0, limitCount);
+    
+    return popularDeals;
+  } catch (error) {
+    console.error('Error getting popular deals:', error);
+    return [];
+  }
+};
+
+/**
+ * 마감 임박 떨이 (6시간 이내)
+ */
+export const getExpiringDeals = async (limitCount: number = 10): Promise<Deal[]> => {
+  try {
+    const q = query(
+      collection(db, collections.deals),
+      where('status', '==', 'active'),
+      limit(limitCount * 3)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const now = new Date();
+    const sixHoursLater = new Date(now.getTime() + 6 * 60 * 60 * 1000);
+    
+    const expiringDeals = querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        expiryDate: doc.data().expiryDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate()
+      }) as Deal)
+      .filter(deal => 
+        deal.remainingQuantity > 0 && 
+        deal.expiryDate && 
+        deal.expiryDate > now &&
+        deal.expiryDate <= sixHoursLater
+      )
+      .sort((a, b) => a.expiryDate.getTime() - b.expiryDate.getTime()) // 마감 시간 순
+      .slice(0, limitCount);
+    
+    return expiringDeals;
+  } catch (error) {
+    console.error('Error getting expiring deals:', error);
+    return [];
+  }
+};

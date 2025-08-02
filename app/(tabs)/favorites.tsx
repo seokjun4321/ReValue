@@ -6,9 +6,33 @@ import "../global.css";
 
 export default function Favorites() {
   const [selectedTab, setSelectedTab] = useState('products'); // 'products' or 'stores'
+  
+  // 각 아이템의 알림 설정 상태 관리
+  const [notificationSettings, setNotificationSettings] = useState({
+    products: {
+      '유기농 식빵': true,
+      '샐러드 세트': false,
+      '생과일 주스': true,
+      '홈메이드 케이크': false,
+    },
+    stores: {
+      '스타벅스 역삼점': true,
+      '파리바게트 강남점': false,
+      '투썸플레이스 서초점': true,
+    }
+  });
 
   // 알림 토글 핸들러
-  const handleNotificationToggle = async (value: boolean, itemName: string) => {
+  const handleNotificationToggle = async (value: boolean, itemName: string, type: 'products' | 'stores') => {
+    // UI 상태 먼저 업데이트
+    setNotificationSettings(prev => ({
+      ...prev,
+      [type]: {
+        ...prev[type],
+        [itemName]: value
+      }
+    }));
+
     if (value) {
       // 알림이 켜지면 테스트 알림 전송
       await sendDealNotification(
@@ -22,6 +46,8 @@ export default function Favorites() {
     } else {
       console.log(`${itemName} 알림이 비활성화되었습니다.`);
     }
+    
+    // TODO: 실제 서버에 알림 설정 저장
   };
 
   return (
@@ -60,21 +86,22 @@ export default function Favorites() {
                   <Ionicons name="image" size={40} color="#dcfce7" />
                 </View>
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>디저트39 케이크 세트</Text>
-                  <Text style={styles.itemSubtitle}>디저트39 명동점</Text>
+                  <Text style={styles.itemTitle}>유기농 식빵 🍞</Text>
+                  <Text style={styles.itemSubtitle}>파리바게트 강남점</Text>
                   <View style={styles.priceContainer}>
                     <Text style={styles.itemPrice}>3,000원</Text>
-                    <Text style={styles.originalPrice}>10,000원</Text>
+                    <Text style={styles.originalPrice}>5,000원</Text>
                   </View>
-                  <Text style={styles.itemStatus}>2시간 후 마감</Text>
+                  <Text style={styles.itemStatus}>⏰ 1시간 후 마감</Text>
                 </View>
               </View>
               <View style={styles.itemActions}>
                 <Ionicons name="heart" size={20} color="#f87171" />
                 <View style={styles.notificationToggle}>
+                  <Text style={styles.toggleLabel}>알림받기</Text>
                   <Switch
-                    value={true}
-                    onValueChange={(value) => handleNotificationToggle(value, '찜한 제품')}
+                    value={notificationSettings.products['유기농 식빵']}
+                    onValueChange={(value) => handleNotificationToggle(value, '유기농 식빵', 'products')}
                     trackColor={{ false: '#dcfce7', true: '#22c55e' }}
                     thumbColor="#ffffff"
                     style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
@@ -89,8 +116,8 @@ export default function Favorites() {
                   <Ionicons name="image" size={40} color="#dcfce7" />
                 </View>
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>여름 티셔츠 모음</Text>
-                  <Text style={styles.itemSubtitle}>패션몰 강남점</Text>
+                  <Text style={styles.itemTitle}>샐러드 세트 🥗</Text>
+                  <Text style={styles.itemSubtitle}>헬시푸드 역삼점</Text>
                   <View style={styles.priceContainer}>
                     <Text style={styles.itemPrice}>15,000원</Text>
                     <Text style={styles.originalPrice}>30,000원</Text>
@@ -101,9 +128,10 @@ export default function Favorites() {
               <View style={styles.itemActions}>
                 <Ionicons name="heart" size={20} color="#f87171" />
                 <View style={styles.notificationToggle}>
+                  <Text style={styles.toggleLabel}>알림받기</Text>
                   <Switch
-                    value={false}
-                    onValueChange={(value) => handleNotificationToggle(value, '찜한 제품')}
+                    value={notificationSettings.products['샐러드 세트']}
+                    onValueChange={(value) => handleNotificationToggle(value, '샐러드 세트', 'products')}
                     trackColor={{ false: '#dcfce7', true: '#22c55e' }}
                     thumbColor="#ffffff"
                     style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
@@ -118,8 +146,8 @@ export default function Favorites() {
                   <Ionicons name="image" size={40} color="#dcfce7" />
                 </View>
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>세제/샴푸 세트</Text>
-                  <Text style={styles.itemSubtitle}>라이프마트 홍대점</Text>
+                  <Text style={styles.itemTitle}>생과일 주스 🧃</Text>
+                  <Text style={styles.itemSubtitle}>쥬시 강남점</Text>
                   <View style={styles.priceContainer}>
                     <Text style={styles.itemPrice}>8,000원</Text>
                     <Text style={styles.originalPrice}>20,000원</Text>
@@ -130,9 +158,10 @@ export default function Favorites() {
               <View style={styles.itemActions}>
                 <Ionicons name="heart" size={20} color="#f87171" />
                 <View style={styles.notificationToggle}>
+                  <Text style={styles.toggleLabel}>알림받기</Text>
                   <Switch
-                    value={true}
-                    onValueChange={(value) => handleNotificationToggle(value, '찜한 제품')}
+                    value={notificationSettings.products['생과일 주스']}
+                    onValueChange={(value) => handleNotificationToggle(value, '생과일 주스', 'products')}
                     trackColor={{ false: '#dcfce7', true: '#22c55e' }}
                     thumbColor="#ffffff"
                     style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
@@ -150,20 +179,21 @@ export default function Favorites() {
                   <Ionicons name="storefront" size={40} color="#dcfce7" />
                 </View>
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>디저트39 명동점</Text>
-                  <Text style={styles.itemSubtitle}>매일 새로운 떨이 등록</Text>
+                  <Text style={styles.itemTitle}>스타벅스 역삼점 ☕</Text>
+                  <Text style={styles.itemSubtitle}>새로운 떨이 등록 시 알림</Text>
                   <View style={styles.storeInfo}>
                     <Text style={styles.storeStats}>⭐ 4.8 (124개 리뷰)</Text>
-                    <Text style={styles.storeDistance}>📍 150m</Text>
+                    <Text style={styles.storeDistance}>📍 500m</Text>
                   </View>
                 </View>
               </View>
               <View style={styles.itemActions}>
                 <Ionicons name="heart" size={20} color="#f87171" />
                 <View style={styles.notificationToggle}>
+                  <Text style={styles.toggleLabel}>알림받기</Text>
                   <Switch
-                    value={true}
-                    onValueChange={(value) => handleNotificationToggle(value, '찜한 제품')}
+                    value={notificationSettings.stores['스타벅스 역삼점']}
+                    onValueChange={(value) => handleNotificationToggle(value, '스타벅스 역삼점', 'stores')}
                     trackColor={{ false: '#dcfce7', true: '#22c55e' }}
                     thumbColor="#ffffff"
                     style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
@@ -178,8 +208,8 @@ export default function Favorites() {
                   <Ionicons name="storefront" size={40} color="#dcfce7" />
                 </View>
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemTitle}>패션몰 강남점</Text>
-                  <Text style={styles.itemSubtitle}>의류 전문 매장</Text>
+                  <Text style={styles.itemTitle}>파리바게트 강남점 🥐</Text>
+                  <Text style={styles.itemSubtitle}>빵&디저트 전문</Text>
                   <View style={styles.storeInfo}>
                     <Text style={styles.storeStats}>⭐ 4.6 (89개 리뷰)</Text>
                     <Text style={styles.storeDistance}>📍 300m</Text>
@@ -189,9 +219,10 @@ export default function Favorites() {
               <View style={styles.itemActions}>
                 <Ionicons name="heart" size={20} color="#f87171" />
                 <View style={styles.notificationToggle}>
+                  <Text style={styles.toggleLabel}>알림받기</Text>
                   <Switch
-                    value={false}
-                    onValueChange={(value) => handleNotificationToggle(value, '찜한 제품')}
+                    value={notificationSettings.stores['파리바게트 강남점']}
+                    onValueChange={(value) => handleNotificationToggle(value, '파리바게트 강남점', 'stores')}
                     trackColor={{ false: '#dcfce7', true: '#22c55e' }}
                     thumbColor="#ffffff"
                     style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
@@ -325,6 +356,13 @@ const styles = StyleSheet.create({
   },
   notificationToggle: {
     marginTop: 8,
+    alignItems: 'center',
+  },
+  toggleLabel: {
+    fontSize: 10,
+    color: '#16a34a',
+    fontWeight: '600',
+    marginBottom: 4,
   },
   
   // 탭 스타일
