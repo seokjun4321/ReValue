@@ -6,12 +6,17 @@ export default function TabsLayout() {
     <Tabs screenOptions={{
       headerShown: false,
       tabBarStyle: {
-        backgroundColor: '#1a1a1a',
-        borderTopColor: '#333',
-        borderTopWidth: 1,
+        backgroundColor: '#ffffff', // White background
+        borderTopColor: '#22c55e', // Green border
+        borderTopWidth: 2,
+        shadowColor: '#16a34a', // Green shadow
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 10,
       },
-      tabBarActiveTintColor: '#fbbf24',
-      tabBarInactiveTintColor: '#666',
+      tabBarActiveTintColor: '#22c55e', // Active tab in green
+      tabBarInactiveTintColor: '#9ca3af', // Inactive tab in gray
     }}>
       <Tabs.Screen
         name="home"

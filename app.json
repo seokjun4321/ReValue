@@ -39,7 +39,15 @@
           "backgroundColor": "#ffffff"
         }
       ],
-      "expo-maps"
+      "expo-maps",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#22c55e",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
