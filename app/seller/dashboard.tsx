@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { getStoreStats, getDealsByCategory, updateDeal } from '../../lib/firestore';
-import { Deal } from '../../lib/types';
+// import { getStoreStats, getDealsByCategory, updateDeal, getOrdersBySeller } from '../../lib/firestore'; // 실제 구현 시 주석 해제
+import { Deal, Order } from '../../lib/types'; // Order 타입 임포트
 import { auth } from '../../firebase';
 
 interface StoreStats {
@@ -24,10 +24,32 @@ interface StoreStats {
   averageDiscount: number;
 }
 
+// --- UI 확인을 위한 가상 데이터 및 함수 ---
+const getStoreStats = async (storeId: string): Promise<StoreStats> => ({
+  totalDeals: 15,
+  activeDeals: 4,
+  totalOrders: 28,
+  completedOrders: 25,
+  totalRevenue: 350000,
+  averageDiscount: 45.5,
+});
+const getDealsByCategory = async (category: string, limit: number): Promise<Deal[]> => [
+  { id: 'deal1', title: '유기농 식빵', category: 'bakery', discountedPrice: 3000, originalPrice: 5000, discountRate: 40, remainingQuantity: 5, totalQuantity: 10, status: 'active', storeId: 'temp_store_id', storeName: '테스트 매장', expiryDate: new Date(), location: { latitude: 0, longitude: 0 } },
+  { id: 'deal2', title: '샐러드 세트', category: 'food', discountedPrice: 15000, originalPrice: 30000, discountRate: 50, remainingQuantity: 2, totalQuantity: 5, status: 'active', storeId: 'temp_store_id', storeName: '테스트 매장', expiryDate: new Date(), location: { latitude: 0, longitude: 0 } },
+];
+const getOrdersBySeller = async (storeId: string): Promise<Order[]> => [
+    { id: 'order1', dealTitle: '유기농 케이크 3종 세트', totalPrice: 15000, orderedAt: new Date(), status: 'completed' },
+    { id: 'order3', dealTitle: '아메리카노 2잔', totalPrice: 4000, orderedAt: new Date(new Date().setDate(new Date().getDate() - 1)), status: 'completed' },
+];
+const updateDeal = async (dealId: string, data: any): Promise<boolean> => true;
+// ------------------------------------
+
+
 export default function SellerDashboard() {
   const router = useRouter();
   const [stats, setStats] = useState<StoreStats | null>(null);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]); // 판매 내역 상태 추가
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -39,14 +61,16 @@ export default function SellerDashboard() {
     try {
       setLoading(true);
       
-      // 병렬로 통계와 떨이 목록 로드
-      const [storeStats, activeDeals] = await Promise.all([
+      // 병렬로 통계, 떨이 목록, 주문 내역 로드
+      const [storeStats, activeDeals, storeOrders] = await Promise.all([
         getStoreStats(storeId),
-        loadStoreDeals()
+        loadStoreDeals(),
+        getOrdersBySeller(storeId) // 판매 내역 로드
       ]);
       
       setStats(storeStats);
       setDeals(activeDeals);
+      setOrders(storeOrders); // 판매 내역 상태 업데이트
     } catch (error) {
       console.error('대시보드 데이터 로드 실패:', error);
     } finally {
@@ -56,8 +80,6 @@ export default function SellerDashboard() {
 
   // 매장의 떨이 목록 로드
   const loadStoreDeals = async (): Promise<Deal[]> => {
-    // 임시로 모든 떨이를 가져와서 매장 ID로 필터링
-    // 실제로는 storeId로 쿼리해야 함
     const allDeals = await getDealsByCategory('food', 20);
     return allDeals.filter(deal => deal.storeId === storeId);
   };
@@ -74,12 +96,9 @@ export default function SellerDashboard() {
     try {
       const success = await updateDeal(dealId, { status: newStatus });
       if (success) {
-        // 로컬 상태 업데이트
         setDeals(deals.map(deal => 
           deal.id === dealId ? { ...deal, status: newStatus } : deal
         ));
-        
-        // 통계 새로고침
         const newStats = await getStoreStats(storeId);
         setStats(newStats);
       }
@@ -191,6 +210,24 @@ export default function SellerDashboard() {
               <Text style={styles.actionButtonText}>고객 관리</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* --- 최근 판매 내역 섹션 추가 --- */}
+        <View style={styles.recentSalesSection}>
+          <Text style={styles.sectionTitle}>최근 판매 내역</Text>
+          {orders.length === 0 ? (
+            <Text style={styles.emptyText}>아직 판매 내역이 없습니다.</Text>
+          ) : (
+            orders.map((order) => (
+              <View key={order.id} style={styles.salesItem}>
+                <View>
+                  <Text style={styles.salesTitle}>{order.dealTitle}</Text>
+                  <Text style={styles.salesDate}>{order.orderedAt.toLocaleDateString()}</Text>
+                </View>
+                <Text style={styles.salesPrice}>{order.totalPrice.toLocaleString()}원</Text>
+              </View>
+            ))
+          )}
         </View>
 
         {/* 활성 떨이 목록 */}
@@ -308,8 +345,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  
-  // 통계 카드
   statsContainer: {
     marginBottom: 24,
   },
@@ -370,8 +405,6 @@ const styles = StyleSheet.create({
     color: '#9ca3af',
     marginLeft: 16,
   },
-  
-  // 빠른 액션
   quickActions: {
     marginBottom: 24,
   },
@@ -402,8 +435,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
-  
-  // 떨이 목록
   activeDealsSection: {
     marginBottom: 40,
   },
@@ -519,5 +550,42 @@ const styles = StyleSheet.create({
   actionButtonSmall: {
     padding: 6,
     marginHorizontal: 2,
+  },
+  // --- 최근 판매 내역 스타일 ---
+  recentSalesSection: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#dcfce7',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+  },
+  salesItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0fdf4',
+  },
+  salesTitle: {
+    fontSize: 16,
+    color: '#166534',
+    fontWeight: '500',
+  },
+  salesDate: {
+    fontSize: 12,
+    color: '#9ca3af',
+    marginTop: 4,
+  },
+  salesPrice: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#166534',
   },
 });

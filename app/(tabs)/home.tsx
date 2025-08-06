@@ -236,25 +236,30 @@ export default function Home() {
           ) : (
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.dealsContainer}>
-                {todaysDeals.map((deal) => (
-                  <TouchableOpacity key={deal.id} style={styles.dealCard}>
-                    <View style={styles.dealImagePlaceholder}>
-                      <Ionicons name="image" size={40} color="#dcfce7" />
-                    </View>
-                    <View style={styles.dealInfo}>
-                      <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
-                      <Text style={styles.dealStore}>{deal.storeName}</Text>
-                      <View style={styles.dealPriceContainer}>
-                        <Text style={styles.dealPrice}>{deal.discountedPrice.toLocaleString()}원</Text>
-                        <Text style={styles.dealOriginalPrice}>{deal.originalPrice.toLocaleString()}원</Text>
-                      </View>
-                      <Text style={styles.dealDiscount}>{deal.discountRate}% 할인</Text>
-                      <Text style={styles.dealDistance}>📍 {formatDistance(deal)}</Text>
-                      <Text style={styles.dealTime}>⏰ {formatTimeUntilExpiry(deal.expiryDate)}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
+  {todaysDeals.map((deal) => (
+    // TouchableOpacity에 onPress 이벤트 추가
+    <TouchableOpacity 
+      key={deal.id} 
+      style={styles.dealCard}
+      onPress={() => router.push(`/deal/${deal.id}`)} // 이 부분을 추가!
+    >
+      <View style={styles.dealImagePlaceholder}>
+        <Ionicons name="image" size={40} color="#dcfce7" />
+      </View>
+      <View style={styles.dealInfo}>
+        <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
+        <Text style={styles.dealStore}>{deal.storeName}</Text>
+        <View style={styles.dealPriceContainer}>
+          <Text style={styles.dealPrice}>{deal.discountedPrice.toLocaleString()}원</Text>
+          <Text style={styles.dealOriginalPrice}>{deal.originalPrice.toLocaleString()}원</Text>
+        </View>
+        <Text style={styles.dealDiscount}>{deal.discountRate}% 할인</Text>
+        <Text style={styles.dealDistance}>📍 {formatDistance(deal)}</Text>
+        <Text style={styles.dealTime}>⏰ {formatTimeUntilExpiry(deal.expiryDate)}</Text>
+      </View>
+    </TouchableOpacity>
+  ))}
+</View>
             </ScrollView>
           )}
         </View>

@@ -1,11 +1,11 @@
 import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter } from 'expo-router'; // useRouter 임포트
 import "../global.css";
 
 export default function Profile() {
-  const router = useRouter();
+  const router = useRouter(); // router 훅 사용
 
   const handleLogout = () => {
     // TODO: Firebase 로그아웃 처리
@@ -27,7 +27,6 @@ export default function Profile() {
           <Text style={styles.userName}>사용자님</Text>
           <Text style={styles.userEmail}>user@example.com</Text>
           
-          {/* 환경 기여 지표 */}
           <View style={styles.ecoStatsContainer}>
             <View style={styles.ecoStat}>
               <Ionicons name="leaf" size={20} color="#22c55e" />
@@ -49,7 +48,8 @@ export default function Profile() {
 
         {/* 메뉴 섹션 */}
         <View style={styles.menuSection}>
-          <TouchableOpacity style={styles.menuItem}>
+          {/* ----- 아래 메뉴들에 onPress 이벤트 추가 ----- */}
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/history')}>
             <View style={styles.menuContent}>
               <Ionicons name="receipt" size={24} color="#22c55e" />
               <Text style={styles.menuText}>거래 내역</Text>
@@ -57,16 +57,17 @@ export default function Profile() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reviews')}>
             <View style={styles.menuContent}>
               <Ionicons name="star" size={24} color="#22c55e" />
               <Text style={styles.menuText}>내 후기</Text>
               <Ionicons name="chevron-forward" size={20} color="#16a34a" />
             </View>
           </TouchableOpacity>
+        </View>
 
-          {/* 판매자 모드 버튼들 */}
-          <View style={styles.sellerSection}>
+        {/* 판매자 모드 섹션 */}
+        <View style={styles.sellerMenuSection}>
             <TouchableOpacity 
               style={styles.sellerModeButton}
               onPress={() => router.push('/seller/dashboard')}
@@ -88,9 +89,11 @@ export default function Profile() {
                 <Ionicons name="chevron-forward" size={20} color="#22c55e" />
               </View>
             </TouchableOpacity>
-          </View>
+        </View>
 
-          <TouchableOpacity style={styles.menuItem}>
+        {/* 설정 메뉴 섹션 */}
+        <View style={styles.menuSection}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
             <View style={styles.menuContent}>
               <Ionicons name="settings" size={24} color="#22c55e" />
               <Text style={styles.menuText}>설정</Text>
@@ -98,7 +101,7 @@ export default function Profile() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications')}>
             <View style={styles.menuContent}>
               <Ionicons name="notifications" size={24} color="#22c55e" />
               <Text style={styles.menuText}>알림 설정</Text>
@@ -106,7 +109,7 @@ export default function Profile() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help')}>
             <View style={styles.menuContent}>
               <Ionicons name="help-circle" size={24} color="#22c55e" />
               <Text style={styles.menuText}>도움말</Text>
@@ -114,7 +117,7 @@ export default function Profile() {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/about')}>
             <View style={styles.menuContent}>
               <Ionicons name="information-circle" size={24} color="#22c55e" />
               <Text style={styles.menuText}>앱 정보</Text>
@@ -133,13 +136,14 @@ export default function Profile() {
   );
 }
 
+// 스타일은 기존과 동일하지만, 구분을 위해 sellerMenuSection 등을 추가했습니다.
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f0fdf4', // Light green background
+    backgroundColor: '#f0fdf4',
   },
   header: {
-    backgroundColor: '#22c55e', // Green header
+    backgroundColor: '#22c55e',
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -153,8 +157,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
-  
-  // 프로필 섹션
   profileSection: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -183,8 +185,6 @@ const styles = StyleSheet.create({
     color: '#16a34a',
     marginBottom: 20,
   },
-  
-  // 환경 기여 지표
   ecoStatsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -208,8 +208,6 @@ const styles = StyleSheet.create({
     color: '#16a34a',
     marginTop: 2,
   },
-  
-  // 메뉴 섹션
   menuSection: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
@@ -235,16 +233,13 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontWeight: '500',
   },
-  
-  // 판매자 섹션
-  sellerSection: {
-    marginBottom: 24,
+  sellerMenuSection: {
+    marginBottom: 20,
+    gap: 12,
   },
   sellerModeButton: {
     backgroundColor: '#eff6ff',
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
     borderWidth: 2,
     borderColor: '#3b82f6',
   },
@@ -258,7 +253,6 @@ const styles = StyleSheet.create({
   sellerUploadButton: {
     backgroundColor: '#f0fdf4',
     borderRadius: 16,
-    padding: 16,
     borderWidth: 2,
     borderColor: '#22c55e',
   },
@@ -269,8 +263,6 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontWeight: 'bold',
   },
-  
-  // 로그아웃 버튼
   logoutButton: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
