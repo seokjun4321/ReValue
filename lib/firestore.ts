@@ -13,10 +13,11 @@ import {
   orderBy, 
   limit, 
   serverTimestamp,
-  Timestamp
+  Timestamp,
+  writeBatch
 } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { db, storage } from '../firebase';
+import { db, auth } from '../firebase';
+import { validateImageSize } from './imageUtils';
 import { Deal, Store, User, Order, Review, collections, CategoryType } from './types';
 
 // ===== DEAL 관련 함수 =====
@@ -39,22 +40,33 @@ export const addDeal = async (dealData: Omit<Deal, 'id' | 'createdAt' | 'updated
 };
 
 /**
- * 떨이 이미지 업로드
+ * 떨이 이미지 업로드 (개선된 버전)
  */
 export const uploadDealImages = async (dealId: string, imageUris: string[]): Promise<string[]> => {
   try {
-    const uploadPromises = imageUris.map(async (uri, index) => {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const imageRef = ref(storage, `deals/${dealId}/image_${index}.jpg`);
-      await uploadBytes(imageRef, blob);
-      return getDownloadURL(imageRef);
-    });
+    // 현재 로그인한 사용자 확인
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('사용자가 로그인되어 있지 않습니다.');
+    }
 
-    return await Promise.all(uploadPromises);
-  } catch (error) {
-    console.error('Error uploading images:', error);
-    return [];
+    const uploadedUrls: string[] = [];
+
+    // 각 이미지 처리
+    for (let i = 0; i < imageUris.length; i++) {
+      const uri = imageUris[i];
+      console.log(`이미지 처리 중 ${i + 1}/${imageUris.length}`);
+
+      // 이미지 크기 검증
+      await validateImageSize(uri);
+      uploadedUrls.push(uri);
+    }
+
+    console.log(`총 ${uploadedUrls.length}개 이미지 처리 완료`);
+    return uploadedUrls;
+  } catch (error: any) {
+    console.error('떨이 이미지 처리 실패:', error);
+    throw error;
   }
 };
 
@@ -141,17 +153,80 @@ export const getDealsByCategory = async (category: string, limitCount: number = 
 /**
  * 떨이 정보 업데이트
  */
-export const updateDeal = async (dealId: string, updates: Partial<Deal>): Promise<boolean> => {
+export const updateDeal = async (dealId: string, updates: Partial<Deal>, newImages?: string[]): Promise<boolean> => {
   try {
+    // 현재 로그인한 사용자 확인
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('사용자가 로그인되어 있지 않습니다.');
+    }
+
+    // 떨이 정보 가져오기
     const dealRef = doc(db, collections.deals, dealId);
-    await updateDoc(dealRef, {
+    const dealSnap = await getDoc(dealRef);
+    
+    if (!dealSnap.exists()) {
+      throw new Error('존재하지 않는 떨이입니다.');
+    }
+
+    const dealData = dealSnap.data();
+    
+    // 권한 확인
+    if (dealData.sellerId !== currentUser.uid) {
+      throw new Error('이 떨이를 수정할 권한이 없습니다.');
+    }
+
+    // 이미지가 있다면 이미지 처리
+    let imageUrls = dealData.images || [];
+    if (newImages && newImages.length > 0) {
+      // 이미지 크기 검증
+      for (const imageUri of newImages) {
+        await validateImageSize(imageUri);
+      }
+      imageUrls = newImages;
+    }
+
+    // 업데이트할 데이터 준비
+    const updateData = {
       ...updates,
+      images: imageUrls,
       updatedAt: serverTimestamp()
-    });
+    };
+
+    // 가격 유효성 검사
+    if (updates.originalPrice !== undefined && updates.discountedPrice !== undefined) {
+      if (updates.discountedPrice >= updates.originalPrice) {
+        throw new Error('할인 가격은 원래 가격보다 낮아야 합니다.');
+      }
+    } else if (updates.discountedPrice !== undefined && updates.discountedPrice >= dealData.originalPrice) {
+      throw new Error('할인 가격은 원래 가격보다 낮아야 합니다.');
+    } else if (updates.originalPrice !== undefined && dealData.discountedPrice >= updates.originalPrice) {
+      throw new Error('할인 가격은 원래 가격보다 낮아야 합니다.');
+    }
+
+    // 수량 유효성 검사
+    if (updates.remainingQuantity !== undefined && updates.totalQuantity !== undefined) {
+      if (updates.remainingQuantity > updates.totalQuantity) {
+        throw new Error('남은 수량은 총 수량을 초과할 수 없습니다.');
+      }
+    } else if (updates.remainingQuantity !== undefined && updates.remainingQuantity > dealData.totalQuantity) {
+      throw new Error('남은 수량은 총 수량을 초과할 수 없습니다.');
+    }
+
+    // 마감 시간 유효성 검사
+    if (updates.expiryDate) {
+      const expiryDate = updates.expiryDate instanceof Date ? updates.expiryDate : updates.expiryDate.toDate();
+      if (expiryDate <= new Date()) {
+        throw new Error('마감 시간은 현재 시간 이후여야 합니다.');
+      }
+    }
+
+    // 데이터 업데이트
+    await updateDoc(dealRef, updateData);
     return true;
-  } catch (error) {
-    console.error('Error updating deal:', error);
-    return false;
+  } catch (error: any) {
+    console.error('떨이 수정 실패:', error);
+    throw error;
   }
 };
 
@@ -162,14 +237,42 @@ export const updateDeal = async (dealId: string, updates: Partial<Deal>): Promis
  */
 export const createOrder = async (orderData: Omit<Order, 'id' | 'orderedAt'>): Promise<string | null> => {
   try {
-    const docRef = await addDoc(collection(db, collections.orders), {
+    // Get the deal document reference
+    const dealRef = doc(db, collections.deals, orderData.dealId);
+    const dealDoc = await getDoc(dealRef);
+
+    if (!dealDoc.exists()) {
+      throw new Error('Deal not found');
+    }
+
+    const dealData = dealDoc.data();
+    if (dealData.remainingQuantity < orderData.quantity) {
+      throw new Error('Not enough quantity available');
+    }
+
+    // Create order and update deal quantity in a batch
+    const batch = writeBatch(db);
+    
+    // Create new order
+    const orderRef = doc(collection(db, collections.orders));
+    batch.set(orderRef, {
       ...orderData,
       orderedAt: serverTimestamp()
     });
-    return docRef.id;
+
+    // Update deal's remaining quantity
+    batch.update(dealRef, {
+      remainingQuantity: dealData.remainingQuantity - orderData.quantity,
+      orderCount: (dealData.orderCount || 0) + 1,
+      updatedAt: serverTimestamp()
+    });
+
+    // Commit the batch
+    await batch.commit();
+    return orderRef.id;
   } catch (error) {
     console.error('Error creating order:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -225,6 +328,39 @@ export const updateOrderStatus = async (orderId: string, status: Order['status']
 };
 
 // ===== USER 관련 함수 =====
+
+/**
+ * 프로필 이미지 업로드
+ */
+export const uploadProfileImage = async (userId: string, imageUri: string): Promise<string | null> => {
+  try {
+    // 현재 로그인한 사용자 확인
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('사용자가 로그인되어 있지 않습니다.');
+    }
+    
+    // 권한 확인
+    if (currentUser.uid !== userId) {
+      throw new Error('프로필 이미지를 업로드할 권한이 없습니다.');
+    }
+
+    // 이미지 크기 검증
+    await validateImageSize(imageUri);
+    
+    // 사용자 프로필 업데이트
+    const userRef = doc(db, collections.users, userId);
+    await updateDoc(userRef, {
+      profileImage: imageUri,
+      updatedAt: serverTimestamp()
+    });
+    
+    return imageUri;
+  } catch (error: any) {
+    console.error('프로필 이미지 업로드 실패:', error);
+    throw error;
+  }
+};
 
 /**
  * 사용자 프로필 생성/업데이트
@@ -552,6 +688,67 @@ export const getExpiringDeals = async (limitCount: number = 10): Promise<Deal[]>
     return expiringDeals;
   } catch (error) {
     console.error('Error getting expiring deals:', error);
+    return [];
+  }
+};
+
+/**
+ * 떨이 검색 (제목, 설명, 매장명으로 검색)
+ */
+export const searchDeals = async (searchTerm: string, limitCount: number = 20): Promise<Deal[]> => {
+  try {
+    if (!searchTerm.trim()) {
+      return [];
+    }
+
+    // Firebase에서는 부분 문자열 검색이 제한적이므로 클라이언트에서 필터링
+    const q = query(
+      collection(db, collections.deals),
+      where('status', '==', 'active'),
+      limit(limitCount * 3) // 필터링을 위해 더 많이 가져옴
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const now = new Date();
+    const searchTermLower = searchTerm.toLowerCase();
+    
+    const searchResults = querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        expiryDate: doc.data().expiryDate?.toDate(),
+        createdAt: doc.data().createdAt?.toDate(),
+        updatedAt: doc.data().updatedAt?.toDate()
+      }) as Deal)
+      .filter(deal => {
+        // 기본 필터링
+        if (deal.remainingQuantity <= 0 || !deal.expiryDate || deal.expiryDate <= now) {
+          return false;
+        }
+        
+        // 검색어 매칭
+        const titleMatch = deal.title.toLowerCase().includes(searchTermLower);
+        const descriptionMatch = deal.description?.toLowerCase().includes(searchTermLower);
+        const storeMatch = deal.storeName.toLowerCase().includes(searchTermLower);
+        
+        return titleMatch || descriptionMatch || storeMatch;
+      })
+      .sort((a, b) => {
+        // 검색 관련도 순 정렬 (제목 매칭이 우선순위)
+        const aTitle = a.title.toLowerCase().includes(searchTermLower);
+        const bTitle = b.title.toLowerCase().includes(searchTermLower);
+        
+        if (aTitle && !bTitle) return -1;
+        if (!aTitle && bTitle) return 1;
+        
+        // 그 다음은 생성일 순
+        return b.createdAt?.getTime() - a.createdAt?.getTime();
+      })
+      .slice(0, limitCount);
+    
+    return searchResults;
+  } catch (error) {
+    console.error('Error searching deals:', error);
     return [];
   }
 };

@@ -2,44 +2,87 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-// import { getDealById, createOrder } from '../../lib/firestore'; // (가상) Firestore 함수
-// import { auth } from '../../firebase';
-import { Deal } from '../../lib/types';
+import { Deal, Order } from '../../lib/types';
+import { auth, db } from '../../firebase';
+import { doc, getDoc, updateDoc, increment, Timestamp, collection, setDoc } from 'firebase/firestore';
+import { collections } from '../../lib/types';
 
-// --- 실제 구현 시 주석 해제 ---
-// const { getDealById, createOrder } = require('../../lib/firestore');
-// const { auth } = require('../../firebase');
-
-// --- 아래는 UI 확인을 위한 가상 데이터 및 함수입니다 ---
+// 떨이 정보 가져오기
 const getDealById = async (id: string): Promise<Deal | null> => {
-  console.log(`Fetching deal with id: ${id}`);
-  return {
-    id: id,
-    title: '유기농 케이크 3종 세트',
-    description: '오늘 만든 신선한 유기농 케이크입니다. 딸기, 초코, 치즈 세가지 맛으로 구성되어 있어요. 오후 10시까지 판매합니다!',
-    images: [], // 실제로는 이미지 URL 배열
-    category: 'bakery',
-    originalPrice: 25000,
-    discountedPrice: 15000,
-    discountRate: 40,
-    totalQuantity: 5,
-    remainingQuantity: 3,
-    expiryDate: new Date(new Date().getTime() + 5 * 60 * 60 * 1000), // 5시간 후 만료
-    storeId: 'seller_store_123',
-    storeName: '해피 베이커리',
-    location: { latitude: 37.5665, longitude: 126.9780 },
-    status: 'active',
-    viewCount: 102,
-    favoriteCount: 12,
-    orderCount: 2,
-  };
+  try {
+    const dealRef = doc(db, collections.deals, id);
+    const dealSnap = await getDoc(dealRef);
+    
+    if (!dealSnap.exists()) {
+      return null;
+    }
+
+    // 조회수 증가
+    await updateDoc(dealRef, {
+      viewCount: increment(1)
+    });
+
+    const data = dealSnap.data();
+    return {
+      id: dealSnap.id,
+      ...data,
+      createdAt: data.createdAt?.toDate(),
+      updatedAt: data.updatedAt?.toDate(),
+      expiryDate: data.expiryDate?.toDate()
+    } as Deal;
+  } catch (error) {
+    console.error('떨이 정보 조회 실패:', error);
+    return null;
+  }
 };
-const createOrder = async (orderData: any) => {
-  console.log("Creating order with data:", orderData);
-  return true; // 성공 시 true 반환
+
+// 주문 생성
+const createOrder = async (orderData: Partial<Order>): Promise<boolean> => {
+  try {
+    // 떨이 정보 다시 확인
+    const dealRef = doc(db, collections.deals, orderData.dealId!);
+    const dealSnap = await getDoc(dealRef);
+    
+    if (!dealSnap.exists()) {
+      throw new Error('존재하지 않는 떨이입니다.');
+    }
+
+    const dealData = dealSnap.data();
+    
+    // 재고 확인
+    if (dealData.remainingQuantity < orderData.quantity!) {
+      throw new Error('남은 수량이 부족합니다.');
+    }
+
+    // 마감 시간 확인
+    const expiryDate = dealData.expiryDate.toDate();
+    if (expiryDate <= new Date()) {
+      throw new Error('마감된 떨이입니다.');
+    }
+
+    // 주문 생성
+    const orderRef = doc(collection(db, collections.orders));
+    await setDoc(orderRef, {
+      ...orderData,
+      id: orderRef.id,
+      orderedAt: Timestamp.now(),
+      status: 'pending',
+      savedAmount: dealData.originalPrice - dealData.discountedPrice
+    });
+
+    // 떨이 정보 업데이트
+    await updateDoc(dealRef, {
+      remainingQuantity: increment(-orderData.quantity!),
+      orderCount: increment(1),
+      updatedAt: Timestamp.now()
+    });
+
+    return true;
+  } catch (error) {
+    console.error('주문 생성 실패:', error);
+    throw error;
+  }
 };
-const auth = { currentUser: { uid: 'buyer_user_456' }};
-// -----------------------------------------------------------
 
 
 export default function DealDetailScreen() {
@@ -81,33 +124,57 @@ export default function DealDetailScreen() {
   };
 
   const processPurchase = async () => {
-    if (!deal || !auth.currentUser) return;
+    if (!deal || !auth.currentUser) {
+      Alert.alert('오류', '로그인이 필요합니다.');
+      router.push('/login');
+      return;
+    }
+
     setPurchasing(true);
     try {
-      const orderData = {
+      // 주문 데이터 생성
+      const orderData: Partial<Order> = {
         dealId: deal.id,
         dealTitle: deal.title,
-        totalPrice: deal.discountedPrice,
-        quantity: 1, // 1개 구매로 단순화
         buyerId: auth.currentUser.uid,
         sellerId: deal.storeId,
-        storeName: deal.storeName,
-        orderedAt: new Date(),
-        status: 'completed',
+        storeId: deal.storeId,
+        quantity: 1,
+        totalPrice: deal.discountedPrice,
+        originalPrice: deal.originalPrice,
+        savedAmount: deal.originalPrice - deal.discountedPrice,
+        buyerContact: auth.currentUser.phoneNumber || auth.currentUser.email || '',
+        reviewed: false
       };
       
-      const success = await createOrder(orderData);
+      try {
+        const orderId = await createOrder(orderData);
 
-      if (success) {
-        Alert.alert("구매 완료", "상품을 성공적으로 구매했습니다. 거래 내역으로 이동합니다.", [
-          { text: "확인", onPress: () => router.replace('/history') }
-        ]);
-      } else {
-        throw new Error("Order creation failed");
+        if (orderId) {
+          Alert.alert(
+            "구매 완료", 
+            "상품을 성공적으로 구매했습니다.\n판매자가 주문을 확인하면 알림을 보내드립니다.", 
+            [
+              { text: "주문 내역 보기", onPress: () => router.replace('/history') },
+              { text: "계속 쇼핑하기", onPress: () => router.back() }
+            ]
+          );
+        } else {
+          throw new Error("주문 생성에 실패했습니다.");
+        }
+      } catch (error: any) {
+        if (error.message === 'Not enough quantity available') {
+          Alert.alert("구매 실패", "죄송합니다. 현재 재고가 부족합니다.");
+        } else {
+          throw error;
+        }
       }
-    } catch (error) {
-      console.error("Purchase failed:", error);
-      Alert.alert("오류", "구매 중 문제가 발생했습니다. 다시 시도해주세요.");
+    } catch (error: any) {
+      console.error("구매 실패:", error);
+      Alert.alert(
+        "구매 실패", 
+        error.message || "구매 중 문제가 발생했습니다. 다시 시도해주세요."
+      );
     } finally {
       setPurchasing(false);
     }
@@ -133,12 +200,25 @@ export default function DealDetailScreen() {
   return (
     <View style={styles.container}>
       <ScrollView>
-        <View style={styles.imagePlaceholder}>
-          <Ionicons name="image-outline" size={80} color="#dcfce7" />
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="arrow-back-circle" size={40} color="#fff" />
-          </TouchableOpacity>
-        </View>
+        {deal.images && deal.images.length > 0 ? (
+          <View style={styles.imageContainer}>
+            <Image
+              source={{ uri: deal.images[0] }}
+              style={styles.image}
+              contentFit="cover"
+            />
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Ionicons name="arrow-back-circle" size={40} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Ionicons name="image-outline" size={80} color="#dcfce7" />
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <Ionicons name="arrow-back-circle" size={40} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.content}>
           <Text style={styles.storeName}>{deal.storeName}</Text>
@@ -187,6 +267,15 @@ export default function DealDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  imageContainer: {
+    height: 300,
+    backgroundColor: '#f0fdf4',
+    position: 'relative',
+  },
+  image: {
+    width: '100%',
+    height: '100%',
+  },
   imagePlaceholder: {
     height: 300,
     backgroundColor: '#22c55e',

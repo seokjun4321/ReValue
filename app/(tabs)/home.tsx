@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   StyleSheet, 
   Text, 
@@ -7,7 +7,9 @@ import {
   TouchableOpacity, 
   RefreshControl, 
   ActivityIndicator,
-  Image
+  Image,
+  TextInput,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -17,7 +19,8 @@ import {
   getOrdersByBuyer, 
   getPopularDeals,
   getExpiringDeals,
-  getUserStats 
+  getUserStats,
+  searchDeals
 } from '../../lib/firestore';
 import { Deal, Order, CategoryType, CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS } from '../../lib/types';
 import { auth } from '../../firebase';
@@ -33,6 +36,12 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // 검색 관련 상태
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<Deal[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   // 데이터 로드
   const loadData = async () => {
@@ -81,12 +90,12 @@ export default function Home() {
     }
   };
 
-  // 새로고침
-  const onRefresh = async () => {
+  // 새로고침 기능
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadData();
     setRefreshing(false);
-  };
+  }, []);
 
   // 카테고리 선택
   const handleCategorySelect = (category: CategoryType | 'all') => {
@@ -98,10 +107,39 @@ export default function Home() {
     }
   };
 
-  // 거리 포맷 (임시)
+  // 거리 계산
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // 지구 반지름 (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // 거리 포맷
   const formatDistance = (deal: Deal): string => {
-    const distances = ['150m', '300m', '500m', '800m', '1.2km'];
-    return distances[Math.floor(Math.random() * distances.length)];
+    // 현재 위치 (임시로 서울 시청 좌표 사용)
+    const currentLocation = {
+      latitude: 37.5665,
+      longitude: 126.9780
+    };
+
+    const distance = calculateDistance(
+      currentLocation.latitude,
+      currentLocation.longitude,
+      deal.location.latitude,
+      deal.location.longitude
+    );
+
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
+    } else {
+      return `${distance.toFixed(1)}km`;
+    }
   };
 
   // 마감 시간 포맷
@@ -136,9 +174,56 @@ export default function Home() {
     return date.toLocaleDateString();
   };
 
+  // 검색 실행
+  const handleSearch = async (term: string) => {
+    if (!term.trim()) {
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const results = await searchDeals(term, 20);
+      setSearchResults(results);
+    } catch (error) {
+      console.error('검색 실패:', error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
+
+  // 검색어 변경 처리 (디바운싱)
+  useEffect(() => {
+    const delayedSearch = setTimeout(() => {
+      if (searchTerm) {
+        handleSearch(searchTerm);
+      } else {
+        setSearchResults([]);
+      }
+    }, 500);
+
+    return () => clearTimeout(delayedSearch);
+  }, [searchTerm]);
+
+  // 검색 모달 열기
+  const openSearchModal = () => {
+    setSearchModalVisible(true);
+  };
+
+  // 검색 모달 닫기
+  const closeSearchModal = () => {
+    setSearchModalVisible(false);
+    setSearchTerm('');
+    setSearchResults([]);
+  };
+
+  // 화면이 포커스될 때마다 데이터 새로고침
   useEffect(() => {
     loadData();
   }, []);
+
+
 
   return (
     <View style={styles.container}>
@@ -161,7 +246,7 @@ export default function Home() {
             <Text style={styles.welcomeTitle}>🎯 떨이 헌터님, 안녕하세요!</Text>
             <Text style={styles.welcomeText}>주변 매장의 특가 상품을 찾아보세요</Text>
           </View>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={openSearchModal}>
             <Ionicons name="search" size={20} color="#22c55e" />
             <Text style={styles.actionButtonText}>검색하기</Text>
           </TouchableOpacity>
@@ -283,6 +368,113 @@ export default function Home() {
           </View>
         )}
       </ScrollView>
+
+      {/* 검색 모달 */}
+      <Modal
+        visible={searchModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closeSearchModal}
+      >
+        <View style={styles.searchModalContainer}>
+          {/* 검색 헤더 */}
+          <View style={styles.searchHeader}>
+            <TouchableOpacity onPress={closeSearchModal} style={styles.searchCloseButton}>
+              <Ionicons name="arrow-back" size={24} color="#22c55e" />
+            </TouchableOpacity>
+            <Text style={styles.searchHeaderTitle}>떨이 검색</Text>
+            <View style={styles.searchHeaderRight} />
+          </View>
+
+          {/* 검색 입력 */}
+          <View style={styles.searchInputContainer}>
+            <View style={styles.searchInputWrapper}>
+              <Ionicons name="search" size={20} color="#9ca3af" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="상품명, 매장명으로 검색하세요"
+                placeholderTextColor="#9ca3af"
+                value={searchTerm}
+                onChangeText={setSearchTerm}
+                autoFocus
+                returnKeyType="search"
+                onSubmitEditing={() => handleSearch(searchTerm)}
+              />
+              {searchTerm.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchTerm('')}>
+                  <Ionicons name="close-circle" size={20} color="#9ca3af" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* 검색 결과 */}
+          <ScrollView style={styles.searchResults} showsVerticalScrollIndicator={false}>
+            {searchLoading ? (
+              <View style={styles.searchLoadingContainer}>
+                <ActivityIndicator size="large" color="#22c55e" />
+                <Text style={styles.searchLoadingText}>검색 중...</Text>
+              </View>
+            ) : searchTerm.length === 0 ? (
+              <View style={styles.searchEmptyState}>
+                <Ionicons name="search" size={64} color="#dcfce7" />
+                <Text style={styles.searchEmptyTitle}>검색어를 입력하세요</Text>
+                <Text style={styles.searchEmptyDescription}>
+                  상품명이나 매장명으로 원하는 떨이를 찾아보세요
+                </Text>
+              </View>
+            ) : searchResults.length === 0 ? (
+              <View style={styles.searchEmptyState}>
+                <Ionicons name="sad-outline" size={64} color="#dcfce7" />
+                <Text style={styles.searchEmptyTitle}>검색 결과가 없습니다</Text>
+                <Text style={styles.searchEmptyDescription}>
+                  다른 검색어로 다시 시도해보세요
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.searchResultsList}>
+                <Text style={styles.searchResultsHeader}>
+                  검색 결과 {searchResults.length}개
+                </Text>
+                {searchResults.map((deal) => (
+                  <TouchableOpacity
+                    key={deal.id}
+                    style={styles.searchResultItem}
+                    onPress={() => {
+                      closeSearchModal();
+                      router.push(`/deal/${deal.id}`);
+                    }}
+                  >
+                    <View style={styles.searchResultImagePlaceholder}>
+                      <Ionicons name="image" size={32} color="#dcfce7" />
+                    </View>
+                    <View style={styles.searchResultInfo}>
+                      <Text style={styles.searchResultTitle} numberOfLines={2}>
+                        {deal.title}
+                      </Text>
+                      <Text style={styles.searchResultStore}>{deal.storeName}</Text>
+                      <View style={styles.searchResultPriceContainer}>
+                        <Text style={styles.searchResultPrice}>
+                          {deal.discountedPrice.toLocaleString()}원
+                        </Text>
+                        <Text style={styles.searchResultOriginalPrice}>
+                          {deal.originalPrice.toLocaleString()}원
+                        </Text>
+                        <Text style={styles.searchResultDiscount}>
+                          {deal.discountRate}% 할인
+                        </Text>
+                      </View>
+                      <Text style={styles.searchResultTime}>
+                        ⏰ {formatTimeUntilExpiry(deal.expiryDate)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -542,5 +734,156 @@ const styles = StyleSheet.create({
   orderStatus: {
     fontSize: 12,
     color: '#16a34a',
+  },
+
+  // 검색 모달 스타일
+  searchModalContainer: {
+    flex: 1,
+    backgroundColor: '#f8fdf8',
+  },
+  searchHeader: {
+    backgroundColor: '#ffffff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dcfce7',
+  },
+  searchCloseButton: {
+    padding: 8,
+  },
+  searchHeaderTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#166534',
+  },
+  searchHeaderRight: {
+    width: 40,
+  },
+  searchInputContainer: {
+    backgroundColor: '#ffffff',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#dcfce7',
+  },
+  searchInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#dcfce7',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#374151',
+    marginLeft: 8,
+    marginRight: 8,
+  },
+  searchResults: {
+    flex: 1,
+    padding: 20,
+  },
+  searchLoadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  searchLoadingText: {
+    fontSize: 16,
+    color: '#166534',
+    marginTop: 12,
+  },
+  searchEmptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+  },
+  searchEmptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#374151',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  searchEmptyDescription: {
+    fontSize: 14,
+    color: '#9ca3af',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  searchResultsList: {
+    paddingBottom: 20,
+  },
+  searchResultsHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#166534',
+    marginBottom: 16,
+  },
+  searchResultItem: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: '#dcfce7',
+  },
+  searchResultImagePlaceholder: {
+    width: 80,
+    height: 80,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  searchResultInfo: {
+    flex: 1,
+  },
+  searchResultTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#166534',
+    marginBottom: 4,
+  },
+  searchResultStore: {
+    fontSize: 14,
+    color: '#16a34a',
+    marginBottom: 8,
+  },
+  searchResultPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  searchResultPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#22c55e',
+    marginRight: 8,
+  },
+  searchResultOriginalPrice: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+    marginRight: 8,
+  },
+  searchResultDiscount: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#ef4444',
+  },
+  searchResultTime: {
+    fontSize: 12,
+    color: '#ef4444',
+    fontWeight: '600',
   },
 });
