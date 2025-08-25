@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, FlatList, Dimensions, ViewToken } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Deal, Order } from '../../lib/types';
@@ -91,6 +91,8 @@ export default function DealDetailScreen() {
   const [deal, setDeal] = useState<Deal | null>(null);
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const { width } = Dimensions.get('window');
 
   useEffect(() => {
     if (id) {
@@ -163,7 +165,7 @@ export default function DealDetailScreen() {
           throw new Error("주문 생성에 실패했습니다.");
         }
       } catch (error: any) {
-        if (error.message === 'Not enough quantity available') {
+        if (error.message === '남은 수량이 부족합니다.') {
           Alert.alert("구매 실패", "죄송합니다. 현재 재고가 부족합니다.");
         } else {
           throw error;
@@ -189,6 +191,16 @@ export default function DealDetailScreen() {
     return `${hours}시간 ${minutes}분 후 마감`;
   };
 
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 50 }).current;
+
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: { viewableItems: Array<ViewToken> }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        setActiveIndex(viewableItems[0].index);
+      }
+    },[]
+  );
+
   if (loading) {
     return <View style={styles.centerContainer}><ActivityIndicator size="large" color="#22c55e" /></View>;
   }
@@ -201,22 +213,44 @@ export default function DealDetailScreen() {
     <View style={styles.container}>
       <ScrollView>
         {deal.images && deal.images.length > 0 ? (
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: deal.images[0] }}
-              style={styles.image}
-              contentFit="cover"
+          <View style={styles.imageSliderContainer}>
+            {/* ===== THE IMAGE SLIDER ===== */}
+            <FlatList
+              data={deal.images}
+              renderItem={({ item }) => (
+                <Image
+                  source={{ uri: `data:image/jpeg;base64,${item}` }}
+                  style={[styles.image, { width: width }]} // Image takes full screen width
+                  resizeMode="cover"
+                />
+              )}
+              keyExtractor={(item, index) => index.toString()}
+              horizontal={true} // Makes the list horizontal
+              pagingEnabled={true} // Snaps to each image
+              showsHorizontalScrollIndicator={false} // Hides the scroll bar
+              onViewableItemsChanged={onViewableItemsChanged}
+              viewabilityConfig={viewabilityConfig}
             />
+            
+            {/* ===== THE INDICATOR DOTS ===== */}
+            <View style={styles.paginationContainer}>
+              {deal.images.map((_, index) => (
+                <View
+                  key={index}
+                  style={[styles.dot, index === activeIndex && styles.activeDot]}
+                />
+              ))}
+            </View>
+
+            {/* ===== THE BACK BUTTON (Overlaid) ===== */}
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <Ionicons name="arrow-back-circle" size={40} color="#fff" />
             </TouchableOpacity>
+
           </View>
         ) : (
           <View style={styles.imagePlaceholder}>
-            <Ionicons name="image-outline" size={80} color="#dcfce7" />
-            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-              <Ionicons name="arrow-back-circle" size={40} color="#fff" />
-            </TouchableOpacity>
+            {/* ... your placeholder code ... */}
           </View>
         )}
 
@@ -264,7 +298,53 @@ export default function DealDetailScreen() {
   );
 }
 
+
+
 const styles = StyleSheet.create({
+   // The main container for the slider and dots
+  imageSliderContainer: {
+    height: 300, // Or whatever height you prefer
+    backgroundColor: '#e5e7eb', // A background color for when images are loading
+  },
+
+  // The style for each image in the slider
+  image: {
+    height: '100%',
+    width: '100%', // The width is set dynamically in the component
+  },
+  
+  // Container for the dots
+  paginationContainer: {
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Style for a single dot
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    marginHorizontal: 4,
+  },
+  
+  // Style for the currently active dot
+  activeDot: {
+    backgroundColor: '#ffffff',
+  },
+
+  // Your existing backButton style is probably fine, just make sure it has a high zIndex
+  backButton: {
+    position: 'absolute',
+    top: 50, // Adjust for your status bar height
+    left: 20,
+    zIndex: 10, // Make sure it's on top of the images
+  },
   container: { flex: 1, backgroundColor: '#fff' },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   imageContainer: {
@@ -272,17 +352,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0fdf4',
     position: 'relative',
   },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
   imagePlaceholder: {
     height: 300,
     backgroundColor: '#22c55e',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  backButton: { position: 'absolute', top: 50, left: 16 },
   content: { padding: 20 },
   storeName: { fontSize: 16, color: '#6b7280', marginBottom: 4 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#166534', marginBottom: 16 },

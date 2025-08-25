@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Dimensions, StyleSheet, View, Text, Platform, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
+import { Dimensions, StyleSheet, View, Text, Platform, TouchableOpacity, Modal, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { getActiveDeals } from '../../lib/firestore';
 import { Deal, CategoryType, CATEGORY_COLORS, CATEGORY_ICONS } from '../../lib/types';
 import { sendDealNotification, NOTIFICATION_TYPES } from '../../lib/notifications';
@@ -35,6 +36,41 @@ function MobileMapScreen() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [notificationEnabled, setNotificationEnabled] = useState(false);
+  const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
+  const [locationPermission, setLocationPermission] = useState(false);
+
+  // 위치 권한 요청 및 현재 위치 가져오기
+  const requestLocationPermission = async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert(
+          '위치 권한 필요',
+          '주변 떨이를 확인하려면 위치 권한이 필요합니다.',
+          [
+            { text: '취소', style: 'cancel' },
+            { text: '설정으로 이동', onPress: () => Location.requestForegroundPermissionsAsync() }
+          ]
+        );
+        setLocationPermission(false);
+        return;
+      }
+
+      setLocationPermission(true);
+      
+      // 현재 위치 가져오기
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      
+      setCurrentLocation(location);
+      console.log('현재 위치:', location.coords);
+    } catch (error) {
+      console.error('위치 권한 요청 실패:', error);
+      Alert.alert('오류', '위치 정보를 가져올 수 없습니다.');
+    }
+  };
 
   // 실시간 떨이 데이터 로드
   const loadDeals = async () => {
@@ -49,14 +85,31 @@ function MobileMapScreen() {
     }
   };
 
-  // 컴포넌트 마운트 시 데이터 로드
+  // 컴포넌트 마운트 시 위치 권한 요청 및 데이터 로드
   useEffect(() => {
-    loadDeals();
+    const initializeLocation = async () => {
+      await requestLocationPermission();
+      loadDeals();
+    };
+    
+    initializeLocation();
     
     // 30초마다 자동 새로고침 (실시간 업데이트)
     const interval = setInterval(loadDeals, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // 현재 위치가 업데이트되면 지도를 해당 위치로 이동
+  useEffect(() => {
+    if (currentLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 1500);
+    }
+  }, [currentLocation]);
 
   const handleMarkerPress = (deal: Deal) => {
     setSelectedMarker(deal);
@@ -67,11 +120,38 @@ function MobileMapScreen() {
     return CATEGORY_ICONS[category] || 'location';
   };
 
-  // 거리 계산 (임시)
+  // 거리 계산 함수 (현재 위치와의 실제 거리)
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // 지구의 반지름 (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const distance = R * c;
+    return distance;
+  };
+
+  // 거리 포맷팅
   const formatDistance = (deal: Deal): string => {
-    // 실제로는 사용자 위치와 계산해야 함
-    const distances = ['150m', '300m', '500m', '800m', '1.2km'];
-    return distances[Math.floor(Math.random() * distances.length)];
+    if (!currentLocation) {
+      return '위치 확인 중...';
+    }
+    
+    const distance = calculateDistance(
+      currentLocation.coords.latitude,
+      currentLocation.coords.longitude,
+      deal.location.latitude,
+      deal.location.longitude
+    );
+    
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
+    } else {
+      return `${distance.toFixed(1)}km`;
+    }
   };
 
   // 마감 시간 표시
@@ -115,37 +195,67 @@ function MobileMapScreen() {
     // TODO: 실제 알림 설정을 Firestore에 저장
   };
 
+  // 현재 위치로 이동하는 함수
+  const moveToCurrentLocation = () => {
+    if (currentLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 1000);
+    }
+  };
+
+  const mapRef = React.useRef<any>(null);
+
+  // 초기 지도 영역 설정 (서울 기본값, 현재 위치는 useEffect에서 이동)
+  const getInitialRegion = () => {
+    // 기본값으로 서울 시청 설정 (현재 위치는 useEffect에서 자동 이동)
+    return {
+      latitude: 37.5665,
+      longitude: 126.9780,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    };
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>지도</Text>
-        <Text style={styles.subTitle}>주변 떨이를 확인해보세요</Text>
-        <TouchableOpacity 
-          style={styles.notificationButton}
-          onPress={toggleNotification}
-        >
-          <Ionicons 
-            name={notificationEnabled ? "notifications" : "notifications-off"} 
-            size={20} 
-            color="#ffffff" 
-          />
-          <Text style={styles.notificationText}>
-            500m 알림 {notificationEnabled ? 'ON' : 'OFF'}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.subTitle}>
+          {locationPermission ? '주변 떨이를 확인해보세요' : '위치 권한을 허용해주세요'}
+        </Text>
         
-        {/* 새로고침 버튼 */}
-        <TouchableOpacity 
-          style={styles.refreshButton}
-          onPress={loadDeals}
-          disabled={loading}
-        >
-          <Ionicons 
-            name="refresh" 
-            size={20} 
-            color="#ffffff" 
-          />
-        </TouchableOpacity>
+        <View style={styles.buttonRow}>
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={toggleNotification}
+          >
+            <Ionicons 
+              name={notificationEnabled ? "notifications" : "notifications-off"} 
+              size={20} 
+              color="#ffffff" 
+            />
+            <Text style={styles.notificationText}>
+              500m 알림 {notificationEnabled ? 'ON' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
+          
+          {/* 새로고침 버튼 */}
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={loadDeals}
+            disabled={loading}
+          >
+            <Ionicons 
+              name="refresh" 
+              size={20} 
+              color="#ffffff" 
+            />
+          </TouchableOpacity>
+        </View>
       </View>
       
       <View style={styles.mapContainer}>
@@ -157,13 +267,12 @@ function MobileMapScreen() {
         )}
         
         <MapView
+          ref={mapRef}
           style={styles.map}
-          initialRegion={{
-            latitude: 37.5665,
-            longitude: 126.9780,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
+          initialRegion={getInitialRegion()}
+          showsUserLocation={locationPermission}
+          showsMyLocationButton={false}
+          followsUserLocation={false}
         >
           {deals.map((deal) => (
             <Marker
@@ -177,6 +286,19 @@ function MobileMapScreen() {
             />
           ))}
         </MapView>
+        
+        {/* 지도 위 현재 위치 버튼 */}
+        <TouchableOpacity 
+          style={styles.currentLocationButton}
+          onPress={moveToCurrentLocation}
+          disabled={!currentLocation}
+        >
+          <Ionicons 
+            name="locate" 
+            size={24} 
+            color={currentLocation ? "#22c55e" : "#9ca3af"} 
+          />
+        </TouchableOpacity>
       </View>
 
       {/* 제품 미리보기 모달 */}
@@ -274,6 +396,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   
+  // 버튼 행
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  
   // 웹 플레이스홀더
   webPlaceholder: {
     flex: 1,
@@ -315,7 +444,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    marginTop: 8,
+    marginRight: 8,
   },
   notificationText: {
     color: '#ffffff',
@@ -324,13 +453,33 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   
+  // 현재 위치 버튼 (지도 위 오버레이)
+  currentLocationButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 1000,
+  },
+  
   // 새로고침 버튼
   refreshButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 20,
     padding: 8,
-    marginTop: 8,
-    marginLeft: 8,
   },
   
   // 로딩 오버레이

@@ -17,11 +17,32 @@ import * as ImagePicker from 'expo-image-picker';
 import { addDeal, uploadDealImages } from '../../lib/firestore';
 import { CategoryType, CATEGORY_LABELS, CATEGORY_COLORS } from '../../lib/types';
 import { auth } from '../../firebase';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export default function SellerUpload() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   
+  const processImage = async (uri: string): Promise<string | null> => {
+    try {
+      const manipulatedImage = await ImageManipulator.manipulateAsync(
+        uri,
+        // Resize the image to have a maximum width of 800 pixels.
+        // The height will be adjusted automatically to maintain the aspect ratio.
+        [{ resize: { width: 800 } }], 
+        { 
+          compress: 0.7, // Compress the image to 70% quality.
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true, // THIS IS THE KEY PART: request the Base64 data.
+        }
+      );
+      return manipulatedImage.base64 || null;
+    } catch (error) {
+      console.error("Error processing image:", error);
+      return null;
+    }
+  };
+
   // 폼 상태
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -34,6 +55,7 @@ export default function SellerUpload() {
   const [images, setImages] = useState<string[]>([]);
 
   // 이미지 선택
+  // MODIFIED pickImage function
   const pickImage = async () => {
     if (images.length >= 3) {
       Alert.alert('알림', '최대 3장까지 업로드 가능합니다.');
@@ -50,11 +72,19 @@ export default function SellerUpload() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
-      quality: 0.8,
+      quality: 1, // Start with full quality, compression is handled by the manipulator
     });
 
     if (!result.canceled && result.assets[0]) {
-      setImages([...images, result.assets[0].uri]);
+      setLoading(true); // Show a loading indicator
+      const base64String = await processImage(result.assets[0].uri);
+      setLoading(false); // Hide loading indicator
+      
+      if (base64String) {
+        setImages([...images, base64String]);
+      } else {
+        Alert.alert('오류', '이미지를 처리하는 중 오류가 발생했습니다.');
+      }
     }
   };
 
@@ -125,7 +155,7 @@ export default function SellerUpload() {
         title: title.trim(),
         description: description.trim(),
         category,
-        images: [], // 업로드 후 URL로 업데이트
+        images: images, // 업로드 후 URL로 업데이트
         originalPrice: parseFloat(originalPrice),
         discountedPrice: parseFloat(discountedPrice),
         discountRate: calculateDiscountRate(),

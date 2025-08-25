@@ -328,9 +328,16 @@ export default function Home() {
       style={styles.dealCard}
       onPress={() => router.push(`/deal/${deal.id}`)} // 이 부분을 추가!
     >
+      {deal.images && deal.images.length > 0 ? (
+      <Image
+        source={{ uri: `data:image/jpeg;base64,${deal.images[0]}` }}
+        style={styles.dealImage}
+      />
+    ) : (
       <View style={styles.dealImagePlaceholder}>
         <Ionicons name="image" size={40} color="#dcfce7" />
       </View>
+    )}
       <View style={styles.dealInfo}>
         <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
         <Text style={styles.dealStore}>{deal.storeName}</Text>
@@ -445,9 +452,16 @@ export default function Home() {
                       router.push(`/deal/${deal.id}`);
                     }}
                   >
-                    <View style={styles.searchResultImagePlaceholder}>
-                      <Ionicons name="image" size={32} color="#dcfce7" />
-                    </View>
+                    {deal.images && deal.images.length > 0 ? (
+                      <Image
+                        source={{ uri: `data:image/jpeg;base64,${deal.images[0]}` }}
+                        style={styles.searchResultImage}
+                      />
+                    ) : (
+                      <View style={styles.searchResultImagePlaceholder}>
+                        <Ionicons name="image" size={32} color="#dcfce7" />
+                      </View>
+                    )}
                     <View style={styles.searchResultInfo}>
                       <Text style={styles.searchResultTitle} numberOfLines={2}>
                         {deal.title}
@@ -503,6 +517,18 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
+  },
+  dealImage: {
+    height: 120,
+    width: '100%', // Make it fill the placeholder area
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  searchResultImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
   },
   welcomeSection: {
     backgroundColor: '#ffffff',
