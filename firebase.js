@@ -12,7 +12,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDcReJ2gI9LQwEgYZnTkG2yTFAtJT1uW8k",
   authDomain: "revalue-e8246.firebaseapp.com",
   projectId: "revalue-e8246",
-  storageBucket: "revalue-e8246.firebasestorage.app",
+  storageBucket: "revalue-e8246.appspot.com",
   messagingSenderId: "816141764936",
   appId: "1:816141764936:web:91449f39be7f7118bf4b7d",
   measurementId: "G-MG63RFB1H1"

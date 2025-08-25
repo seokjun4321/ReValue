@@ -151,15 +151,20 @@ export default function SellerUpload() {
       }
 
       // 이미지 업로드
+      console.log(`${images.length}개 이미지 업로드 시작...`);
       const imageUrls = await uploadDealImages(dealId, images);
-      if (imageUrls.length > 0) {
+      
+      if (imageUrls.length === 0) {
+        Alert.alert('경고', '이미지 업로드에 실패했지만 떨이는 등록되었습니다. 나중에 이미지를 추가해주세요.');
+      } else {
+        console.log(`${imageUrls.length}개 이미지 업로드 성공`);
         // 떨이 데이터에 이미지 URL 업데이트
-        // TODO: updateDeal 함수 호출
+        // TODO: updateDeal 함수 호출하여 images 필드 업데이트
       }
 
       Alert.alert(
         '등록 완료',
-        '떨이가 성공적으로 등록되었습니다!',
+        `떨이가 성공적으로 등록되었습니다!${imageUrls.length > 0 ? ` (이미지 ${imageUrls.length}장 포함)` : ''}`,
         [
           {
             text: '확인',

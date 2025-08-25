@@ -22,6 +22,8 @@ export default function SplashScreen({ onAnimationFinish }: SplashScreenProps) {
   const slideAnim = useRef(new Animated.Value(50)).current;
 
   useEffect(() => {
+    let isSubscribed = true;
+
     const startAnimation = () => {
       // 로고 애니메이션 시퀀스
       Animated.sequence([
@@ -50,8 +52,8 @@ export default function SplashScreen({ onAnimationFinish }: SplashScreenProps) {
         // 4. 추가 대기 후 완료
         Animated.delay(800),
       ]).start(() => {
-        // 애니메이션 완료 후 콜백 실행
-        if (onAnimationFinish) {
+        // 컴포넌트가 마운트된 상태일 때만 콜백 실행
+        if (isSubscribed && onAnimationFinish) {
           onAnimationFinish();
         }
       });
@@ -59,7 +61,12 @@ export default function SplashScreen({ onAnimationFinish }: SplashScreenProps) {
 
     // 약간의 지연 후 애니메이션 시작
     const timer = setTimeout(startAnimation, 200);
-    return () => clearTimeout(timer);
+
+    // 클린업 함수
+    return () => {
+      isSubscribed = false;
+      clearTimeout(timer);
+    };
   }, [fadeAnim, scaleAnim, slideAnim, onAnimationFinish]);
 
   return (

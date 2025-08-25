@@ -11,9 +11,19 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-// import { getStoreStats, getDealsByCategory, updateDeal, getOrdersBySeller } from '../../lib/firestore'; // 실제 구현 시 주석 해제
-import { Deal, Order } from '../../lib/types'; // Order 타입 임포트
-import { auth } from '../../firebase';
+import { Deal, Order, Store } from '../../lib/types';
+import { auth, db } from '../../firebase';
+import { 
+  collection, 
+  query, 
+  where, 
+  getDocs, 
+  updateDoc,
+  doc,
+  orderBy,
+  Timestamp,
+  getDoc
+} from 'firebase/firestore';
 
 interface StoreStats {
   totalDeals: number;
@@ -24,25 +34,131 @@ interface StoreStats {
   averageDiscount: number;
 }
 
-// --- UI 확인을 위한 가상 데이터 및 함수 ---
-const getStoreStats = async (storeId: string): Promise<StoreStats> => ({
-  totalDeals: 15,
-  activeDeals: 4,
-  totalOrders: 28,
-  completedOrders: 25,
-  totalRevenue: 350000,
-  averageDiscount: 45.5,
-});
-const getDealsByCategory = async (category: string, limit: number): Promise<Deal[]> => [
-  { id: 'deal1', title: '유기농 식빵', category: 'bakery', discountedPrice: 3000, originalPrice: 5000, discountRate: 40, remainingQuantity: 5, totalQuantity: 10, status: 'active', storeId: 'temp_store_id', storeName: '테스트 매장', expiryDate: new Date(), location: { latitude: 0, longitude: 0 } },
-  { id: 'deal2', title: '샐러드 세트', category: 'food', discountedPrice: 15000, originalPrice: 30000, discountRate: 50, remainingQuantity: 2, totalQuantity: 5, status: 'active', storeId: 'temp_store_id', storeName: '테스트 매장', expiryDate: new Date(), location: { latitude: 0, longitude: 0 } },
-];
-const getOrdersBySeller = async (storeId: string): Promise<Order[]> => [
-    { id: 'order1', dealTitle: '유기농 케이크 3종 세트', totalPrice: 15000, orderedAt: new Date(), status: 'completed' },
-    { id: 'order3', dealTitle: '아메리카노 2잔', totalPrice: 4000, orderedAt: new Date(new Date().setDate(new Date().getDate() - 1)), status: 'completed' },
-];
-const updateDeal = async (dealId: string, data: any): Promise<boolean> => true;
-// ------------------------------------
+// 판매자의 매장 정보 가져오기
+const getSellerStore = async (userId: string): Promise<Store | null> => {
+  try {
+    const storesRef = collection(db, 'stores');
+    const q = query(storesRef, where('ownerId', '==', userId));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      return null;
+    }
+
+    const storeDoc = querySnapshot.docs[0];
+    return {
+      id: storeDoc.id,
+      ...storeDoc.data()
+    } as Store;
+  } catch (error) {
+    console.error('매장 정보 조회 실패:', error);
+    return null;
+  }
+};
+
+// 판매자의 통계 정보 가져오기
+const getStoreStats = async (storeId: string): Promise<StoreStats> => {
+  try {
+    // 떨이 통계
+    const dealsRef = collection(db, 'deals');
+    const dealsQuery = query(dealsRef, where('storeId', '==', storeId));
+    const dealsSnapshot = await getDocs(dealsQuery);
+    const deals = dealsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    const totalDeals = deals.length;
+    const activeDeals = deals.filter(deal => deal.status === 'active').length;
+    
+    // 주문 통계
+    const ordersRef = collection(db, 'orders');
+    const ordersQuery = query(ordersRef, where('storeId', '==', storeId));
+    const ordersSnapshot = await getDocs(ordersQuery);
+    const orders = ordersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    
+    const totalOrders = orders.length;
+    const completedOrders = orders.filter(order => order.status === 'completed').length;
+    const totalRevenue = orders
+      .filter(order => order.status === 'completed')
+      .reduce((sum, order) => sum + order.totalPrice, 0);
+    
+    // 평균 할인율
+    const totalDiscountRate = deals.reduce((sum, deal) => sum + deal.discountRate, 0);
+    const averageDiscount = totalDeals > 0 ? totalDiscountRate / totalDeals : 0;
+
+    return {
+      totalDeals,
+      activeDeals,
+      totalOrders,
+      completedOrders,
+      totalRevenue,
+      averageDiscount
+    };
+  } catch (error) {
+    console.error('통계 정보 조회 실패:', error);
+    throw error;
+  }
+};
+
+// 판매자의 떨이 목록 가져오기
+const getDealsByStoreId = async (storeId: string): Promise<Deal[]> => {
+  try {
+    const dealsRef = collection(db, 'deals');
+    const q = query(
+      dealsRef,
+      where('storeId', '==', storeId),
+      orderBy('createdAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate(),
+      updatedAt: doc.data().updatedAt?.toDate(),
+      expiryDate: doc.data().expiryDate?.toDate()
+    })) as Deal[];
+  } catch (error) {
+    console.error('떨이 목록 조회 실패:', error);
+    return [];
+  }
+};
+
+// 판매자의 주문 목록 가져오기
+const getOrdersBySeller = async (storeId: string): Promise<Order[]> => {
+  try {
+    const ordersRef = collection(db, 'orders');
+    const q = query(
+      ordersRef,
+      where('storeId', '==', storeId),
+      orderBy('orderedAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      orderedAt: doc.data().orderedAt?.toDate(),
+      completedAt: doc.data().completedAt?.toDate()
+    })) as Order[];
+  } catch (error) {
+    console.error('주문 목록 조회 실패:', error);
+    return [];
+  }
+};
+
+// 떨이 상태 업데이트
+const updateDeal = async (dealId: string, data: Partial<Deal>): Promise<boolean> => {
+  try {
+    const dealRef = doc(db, 'deals', dealId);
+    await updateDoc(dealRef, {
+      ...data,
+      updatedAt: Timestamp.now()
+    });
+    return true;
+  } catch (error) {
+    console.error('떨이 상태 업데이트 실패:', error);
+    return false;
+  }
+};
 
 
 export default function SellerDashboard() {
@@ -53,35 +169,45 @@ export default function SellerDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // 임시 매장 ID (실제로는 현재 사용자의 매장 ID를 가져와야 함)
-  const storeId = 'temp_store_id';
+  const [store, setStore] = useState<Store | null>(null);
 
   // 데이터 로드
   const loadDashboardData = async () => {
     try {
       setLoading(true);
       
+      // 현재 로그인한 사용자 확인
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.error('로그인이 필요합니다.');
+        router.replace('/login');
+        return;
+      }
+
+      // 판매자의 매장 정보 로드
+      const sellerStore = await getSellerStore(currentUser.uid);
+      if (!sellerStore) {
+        console.error('매장 정보를 찾을 수 없습니다.');
+        return;
+      }
+      setStore(sellerStore);
+      
       // 병렬로 통계, 떨이 목록, 주문 내역 로드
-      const [storeStats, activeDeals, storeOrders] = await Promise.all([
-        getStoreStats(storeId),
-        loadStoreDeals(),
-        getOrdersBySeller(storeId) // 판매 내역 로드
+      const [storeStats, storeDeals, storeOrders] = await Promise.all([
+        getStoreStats(sellerStore.id),
+        getDealsByStoreId(sellerStore.id),
+        getOrdersBySeller(sellerStore.id)
       ]);
       
       setStats(storeStats);
-      setDeals(activeDeals);
-      setOrders(storeOrders); // 판매 내역 상태 업데이트
+      setDeals(storeDeals);
+      setOrders(storeOrders);
     } catch (error) {
       console.error('대시보드 데이터 로드 실패:', error);
+      Alert.alert('오류', '데이터를 불러오는데 실패했습니다.');
     } finally {
       setLoading(false);
     }
-  };
-
-  // 매장의 떨이 목록 로드
-  const loadStoreDeals = async (): Promise<Deal[]> => {
-    const allDeals = await getDealsByCategory('food', 20);
-    return allDeals.filter(deal => deal.storeId === storeId);
   };
 
   // 새로고침
@@ -293,7 +419,10 @@ export default function SellerDashboard() {
                         <Ionicons name="pause-circle" size={20} color="#ef4444" />
                       </TouchableOpacity>
                       
-                      <TouchableOpacity style={styles.actionButtonSmall}>
+                      <TouchableOpacity 
+                        style={styles.actionButtonSmall}
+                        onPress={() => router.push(`/seller/edit/${deal.id}`)}
+                      >
                         <Ionicons name="create" size={20} color="#3b82f6" />
                       </TouchableOpacity>
                     </View>

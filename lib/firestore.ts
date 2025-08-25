@@ -215,7 +215,7 @@ export const updateDeal = async (dealId: string, updates: Partial<Deal>, newImag
 
     // 마감 시간 유효성 검사
     if (updates.expiryDate) {
-      const expiryDate = updates.expiryDate instanceof Date ? updates.expiryDate : updates.expiryDate.toDate();
+      const expiryDate = updates.expiryDate instanceof Date ? updates.expiryDate : (updates.expiryDate as Timestamp).toDate();
       if (expiryDate <= new Date()) {
         throw new Error('마감 시간은 현재 시간 이후여야 합니다.');
       }
@@ -593,10 +593,16 @@ export const getUserStats = async (userId: string) => {
       query(collection(db, collections.orders), where('buyerId', '==', userId))
     );
     
-    const orders = ordersQuery.docs.map(doc => ({
-      ...doc.data(),
-      orderedAt: doc.data().orderedAt?.toDate()
-    }));
+    const orders = ordersQuery.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        orderedAt: data.orderedAt?.toDate(),
+        status: data.status,
+        totalPrice: data.totalPrice,
+        savedAmount: data.savedAmount
+      };
+    });
     
     const completedOrders = orders.filter(order => order.status === 'completed');
     

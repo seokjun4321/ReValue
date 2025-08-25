@@ -3,21 +3,32 @@ import { Ionicons } from '@expo/vector-icons';
 
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{
-      headerShown: false,
-      tabBarStyle: {
-        backgroundColor: '#ffffff', // White background
-        borderTopColor: '#22c55e', // Green border
-        borderTopWidth: 2,
-        shadowColor: '#16a34a', // Green shadow
-        shadowOffset: { width: 0, height: -2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 10,
-      },
-      tabBarActiveTintColor: '#22c55e', // Active tab in green
-      tabBarInactiveTintColor: '#9ca3af', // Inactive tab in gray
-    }}>
+    <Tabs 
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: route.name === 'index' 
+          ? { display: 'none' }
+          : {
+              backgroundColor: '#ffffff',
+              borderTopColor: '#22c55e',
+              borderTopWidth: 2,
+              shadowColor: '#16a34a',
+              shadowOffset: { width: 0, height: -2 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 10,
+            },
+        tabBarActiveTintColor: '#22c55e',
+        tabBarInactiveTintColor: '#9ca3af',
+        tabBarButton: route.name === 'index' ? () => null : undefined,
+      })}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          href: null,
+        }}
+      />
       <Tabs.Screen
         name="home"
         options={{
