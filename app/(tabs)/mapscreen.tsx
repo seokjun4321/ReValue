@@ -1,9 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Dimensions, StyleSheet, View, Text, Platform, TouchableOpacity, Modal, ActivityIndicator, Alert } from 'react-native';
+import { 
+  Dimensions, 
+  StyleSheet, 
+  View, 
+  Text, 
+  Platform, 
+  TouchableOpacity, 
+  Modal, 
+  ActivityIndicator, 
+  Alert, 
+  TextInput,
+  ScrollView
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { getActiveDeals } from '../../lib/firestore';
+import * as Linking from 'expo-linking';
+import { getActiveDeals, searchDeals, getPopularDeals } from '../../lib/firestore';
 import { Deal, CategoryType, CATEGORY_COLORS, CATEGORY_ICONS } from '../../lib/types';
+import SmartSearch from '../../components/SmartSearch';
+import ShareButton from '../../components/ShareButton';
+import StoreRecommendation from '../../components/StoreRecommendation';
 import { sendDealNotification, NOTIFICATION_TYPES } from '../../lib/notifications';
 
 export default function MapScreen() {
@@ -27,7 +43,7 @@ export default function MapScreen() {
   return <MobileMapScreen />;
 }
 
-// 모바일 전용 지도 컴포넌트
+  // 모바일 전용 지도 컴포넌트
 function MobileMapScreen() {
   const MapView = require('react-native-maps').default;
   const { Marker } = require('react-native-maps');
@@ -38,6 +54,15 @@ function MobileMapScreen() {
   const [notificationEnabled, setNotificationEnabled] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | null>(null);
   const [locationPermission, setLocationPermission] = useState(false);
+  
+  // 검색 및 필터 관련 상태
+  const [showRecommendModal, setShowRecommendModal] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState<'distance' | 'discount' | 'new' | null>(null);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
+  const [selectedTheme, setSelectedTheme] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<CategoryType | null>(null);
+  const [routeMode, setRouteMode] = useState<'commute' | 'nearby' | null>(null);
 
   // 위치 권한 요청 및 현재 위치 가져오기
   const requestLocationPermission = async () => {
@@ -50,7 +75,16 @@ function MobileMapScreen() {
           '주변 떨이를 확인하려면 위치 권한이 필요합니다.',
           [
             { text: '취소', style: 'cancel' },
-            { text: '설정으로 이동', onPress: () => Location.requestForegroundPermissionsAsync() }
+            { 
+              text: '설정으로 이동', 
+              onPress: async () => {
+                if (Platform.OS === 'ios') {
+                  await Linking.openURL('app-settings:');
+                } else {
+                  await Linking.openSettings();
+                }
+              }
+            }
           ]
         );
         setLocationPermission(false);
@@ -58,28 +92,124 @@ function MobileMapScreen() {
       }
 
       setLocationPermission(true);
-      
-      // 현재 위치 가져오기
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
-      
-      setCurrentLocation(location);
-      console.log('현재 위치:', location.coords);
+      await startLocationUpdates();
     } catch (error) {
       console.error('위치 권한 요청 실패:', error);
       Alert.alert('오류', '위치 정보를 가져올 수 없습니다.');
     }
   };
 
-  // 실시간 떨이 데이터 로드
+  // 실시간 위치 업데이트 시작
+  const startLocationUpdates = async () => {
+    try {
+      // 먼저 현재 위치를 한 번 가져옴
+      const initialLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+      setCurrentLocation(initialLocation);
+      
+      // 실시간 위치 업데이트 구독
+      const subscription = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 5000,  // 5초마다 업데이트
+          distanceInterval: 10, // 10미터 이상 이동했을 때 업데이트
+        },
+        (location) => {
+          setCurrentLocation(location);
+          if (mapRef.current) {
+            mapRef.current.animateToRegion({
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+              latitudeDelta: 0.01,
+              longitudeDelta: 0.01,
+            }, 1000);
+          }
+        }
+      );
+
+      // 컴포넌트 언마운트 시 구독 해제
+      return () => {
+        subscription.remove();
+      };
+    } catch (error) {
+      console.error('위치 업데이트 시작 실패:', error);
+      Alert.alert('오류', '위치 추적을 시작할 수 없습니다.');
+    }
+  };
+
+  // 실시간 떨이 데이터 로드 및 필터링
   const loadDeals = async () => {
     try {
       setLoading(true);
-      const activeDeals = await getActiveDeals(50); // 지도에서는 더 많은 데이터 표시
+      let activeDeals = await getActiveDeals(50); // 지도에서는 더 많은 데이터 표시
+
+      // 필터 적용
+      if (selectedFilter === 'discount') {
+        activeDeals = activeDeals.sort((a, b) => b.discountRate - a.discountRate);
+      } else if (selectedFilter === 'new') {
+        activeDeals = activeDeals.filter(deal => deal.isNew);
+      }
+
+      // 가격 범위 필터
+      activeDeals = activeDeals.filter(deal => 
+        deal.discountedPrice >= priceRange[0] && deal.discountedPrice <= priceRange[1]
+      );
+
+      // 카테고리 필터
+      if (selectedCategory) {
+        activeDeals = activeDeals.filter(deal => deal.category === selectedCategory);
+      }
+
+      // 거리 기반 필터
+      if (currentLocation) {
+        if (routeMode === 'nearby') {
+          // 5분 거리 (도보 기준 약 400m)
+          activeDeals = activeDeals.filter(deal => {
+            const distance = calculateDistance(
+              currentLocation.coords.latitude,
+              currentLocation.coords.longitude,
+              deal.location.latitude,
+              deal.location.longitude
+            );
+            return distance <= 0.4; // 400m = 0.4km
+          });
+        } else if (routeMode === 'commute') {
+          // 출퇴근길 2km 이내
+          activeDeals = activeDeals.filter(deal => {
+            const distance = calculateDistance(
+              currentLocation.coords.latitude,
+              currentLocation.coords.longitude,
+              deal.location.latitude,
+              deal.location.longitude
+            );
+            return distance <= 2;
+          });
+        }
+      }
+
       setDeals(activeDeals);
     } catch (error) {
       console.error('지도 데이터 로드 실패:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 검색 처리
+  const handleSearch = async (term: string) => {
+    if (!term.trim()) {
+      loadDeals();
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const results = await searchDeals(term);
+      setDeals(results);
+    } catch (error) {
+      console.error('검색 실패:', error);
+      Alert.alert('검색 오류', '검색 중 문제가 발생했습니다.');
     } finally {
       setLoading(false);
     }
@@ -98,6 +228,11 @@ function MobileMapScreen() {
     const interval = setInterval(loadDeals, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // 필터 변경 시 데이터 다시 로드
+  useEffect(() => {
+    loadDeals();
+  }, [selectedFilter, selectedCategory, priceRange, routeMode]);
 
   // 현재 위치가 업데이트되면 지도를 해당 위치로 이동
   useEffect(() => {
@@ -209,16 +344,8 @@ function MobileMapScreen() {
 
   const mapRef = React.useRef<any>(null);
 
-  // 초기 지도 영역 설정 (서울 기본값, 현재 위치는 useEffect에서 이동)
-  const getInitialRegion = () => {
-    // 기본값으로 서울 시청 설정 (현재 위치는 useEffect에서 자동 이동)
-    return {
-      latitude: 37.5665,
-      longitude: 126.9780,
-      latitudeDelta: 0.05,
-      longitudeDelta: 0.05,
-    };
-  };
+  // 새로운 스타일 추가
+
 
   return (
     <View style={styles.container}>
@@ -227,78 +354,207 @@ function MobileMapScreen() {
         <Text style={styles.subTitle}>
           {locationPermission ? '주변 떨이를 확인해보세요' : '위치 권한을 허용해주세요'}
         </Text>
-        
-        <View style={styles.buttonRow}>
+
+        {/* 필터 칩 */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterChips}
+        >
           <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={toggleNotification}
+            style={[styles.filterChip, routeMode === 'commute' && styles.filterChipActive]}
+            onPress={() => setRouteMode(routeMode === 'commute' ? null : 'commute')}
           >
-            <Ionicons 
-              name={notificationEnabled ? "notifications" : "notifications-off"} 
-              size={20} 
-              color="#ffffff" 
-            />
-            <Text style={styles.notificationText}>
-              500m 알림 {notificationEnabled ? 'ON' : 'OFF'}
+            <Ionicons name="subway" size={16} color={routeMode === 'commute' ? '#e03131' : '#495057'} />
+            <Text style={[styles.filterChipText, routeMode === 'commute' && styles.filterChipTextActive]}>
+              출퇴근길
             </Text>
           </TouchableOpacity>
-          
-          {/* 새로고침 버튼 */}
+
           <TouchableOpacity 
-            style={styles.refreshButton}
-            onPress={loadDeals}
-            disabled={loading}
+            style={[styles.filterChip, routeMode === 'nearby' && styles.filterChipActive]}
+            onPress={() => setRouteMode(routeMode === 'nearby' ? null : 'nearby')}
           >
-            <Ionicons 
-              name="refresh" 
-              size={20} 
-              color="#ffffff" 
-            />
+            <Ionicons name="walk" size={16} color={routeMode === 'nearby' ? '#e03131' : '#495057'} />
+            <Text style={[styles.filterChipText, routeMode === 'nearby' && styles.filterChipTextActive]}>
+              5분 거리
+            </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.filterChip, selectedFilter === 'new' && styles.filterChipActive]}
+            onPress={() => setSelectedFilter(selectedFilter === 'new' ? null : 'new')}
+          >
+            <Ionicons name="star" size={16} color={selectedFilter === 'new' ? '#e03131' : '#495057'} />
+            <Text style={[styles.filterChipText, selectedFilter === 'new' && styles.filterChipTextActive]}>
+              신규 매장
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.filterChip, selectedFilter === 'discount' && styles.filterChipActive]}
+            onPress={() => setSelectedFilter(selectedFilter === 'discount' ? null : 'discount')}
+          >
+            <Ionicons name="pricetag" size={16} color={selectedFilter === 'discount' ? '#e03131' : '#495057'} />
+            <Text style={[styles.filterChipText, selectedFilter === 'discount' && styles.filterChipTextActive]}>
+              할인율 높은순
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.filterChip, showFilters && styles.filterChipActive]}
+            onPress={() => setShowFilters(!showFilters)}
+          >
+            <Ionicons name="options" size={16} color={showFilters ? '#e03131' : '#495057'} />
+            <Text style={[styles.filterChipText, showFilters && styles.filterChipTextActive]}>
+              필터
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+                  {/* 스마트 검색 */}
+          <SmartSearch onSelect={(deal) => handleMarkerPress(deal)} />
+        
+        <View style={styles.buttonRow}>
+          <View style={styles.buttonGroup}>
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={toggleNotification}
+            >
+              <Ionicons 
+                name={notificationEnabled ? "notifications" : "notifications-off"} 
+                size={20} 
+                color="#ffffff" 
+              />
+              <Text style={styles.actionButtonText}>
+                500m 알림 {notificationEnabled ? 'ON' : 'OFF'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => setShowRecommendModal(true)}
+            >
+              <Ionicons name="add-circle" size={20} color="#ffffff" />
+              <Text style={styles.actionButtonText}>매장 추천</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.buttonGroup}>
+            {/* 새로고침 버튼 */}
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={loadDeals}
+              disabled={loading}
+            >
+              <Ionicons name="refresh" size={20} color="#ffffff" />
+            </TouchableOpacity>
+
+            {/* 공유 버튼 */}
+            <TouchableOpacity 
+              style={styles.iconButton}
+              onPress={() => {
+                if (selectedMarker) {
+                  setShowPreview(false);
+                  setTimeout(() => {
+                    if (selectedMarker) {
+                      ShareButton({ deal: selectedMarker });
+                    }
+                  }, 300);
+                }
+              }}
+              disabled={!selectedMarker}
+            >
+              <Ionicons name="share-social" size={20} color="#ffffff" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
       
       <View style={styles.mapContainer}>
-        {loading && (
+        {loading ? (
           <View style={styles.loadingOverlay}>
             <ActivityIndicator size="large" color="#22c55e" />
             <Text style={styles.loadingText}>떨이를 찾는 중...</Text>
           </View>
-        )}
-        
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          initialRegion={getInitialRegion()}
-          showsUserLocation={locationPermission}
-          showsMyLocationButton={false}
-          followsUserLocation={false}
-        >
-          {deals.map((deal) => (
-            <Marker
-              key={deal.id}
-              coordinate={{
-                latitude: deal.location.latitude,
-                longitude: deal.location.longitude
+        ) : (
+          <>
+            <MapView
+              ref={mapRef}
+              style={styles.map}
+              initialRegion={{
+                latitude: 37.5665,
+                longitude: 126.9780,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
               }}
-              onPress={() => handleMarkerPress(deal)}
-              pinColor={CATEGORY_COLORS[deal.category]}
-            />
-          ))}
-        </MapView>
-        
-        {/* 지도 위 현재 위치 버튼 */}
-        <TouchableOpacity 
-          style={styles.currentLocationButton}
-          onPress={moveToCurrentLocation}
-          disabled={!currentLocation}
-        >
-          <Ionicons 
-            name="locate" 
-            size={24} 
-            color={currentLocation ? "#22c55e" : "#9ca3af"} 
-          />
-        </TouchableOpacity>
+              showsUserLocation={locationPermission}
+              showsMyLocationButton={false}
+              showsCompass={true}
+              showsScale={true}
+              showsTraffic={false}
+              onMapReady={() => {
+                if (currentLocation) {
+                  mapRef.current?.animateToRegion({
+                    latitude: currentLocation.coords.latitude,
+                    longitude: currentLocation.coords.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  });
+                }
+              }}
+              onUserLocationChange={(event) => {
+                if (event.nativeEvent.coordinate) {
+                  const { latitude, longitude } = event.nativeEvent.coordinate;
+                  setCurrentLocation({
+                    coords: { latitude, longitude, altitude: null, accuracy: null, altitudeAccuracy: null, heading: null, speed: null },
+                    timestamp: Date.now()
+                  });
+                }
+              }}
+            >
+              {deals.map((deal) => (
+                <Marker
+                  key={deal.id}
+                  coordinate={{
+                    latitude: deal.location.latitude,
+                    longitude: deal.location.longitude,
+                  }}
+                  onPress={() => handleMarkerPress(deal)}
+                >
+                  <View style={[
+                    styles.customMarker,
+                    { backgroundColor: deal.isNew ? '#e03131' : '#ffffff' }
+                  ]}>
+                    <Ionicons 
+                      name={getMarkerIcon(deal.category)} 
+                      size={16} 
+                      color={deal.isNew ? '#ffffff' : '#e03131'} 
+                    />
+                    {deal.discountRate >= 50 && (
+                      <View style={styles.markerBadge}>
+                        <Text style={styles.markerBadgeText}>{deal.discountRate}%</Text>
+                      </View>
+                    )}
+                  </View>
+                </Marker>
+              ))}
+            </MapView>
+
+            {/* 현재 위치 버튼 */}
+            <TouchableOpacity 
+              style={styles.currentLocationButton}
+              onPress={moveToCurrentLocation}
+              disabled={!currentLocation}
+            >
+              <Ionicons 
+                name="locate" 
+                size={24} 
+                color={currentLocation ? "#22c55e" : "#9ca3af"} 
+              />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* 제품 미리보기 모달 */}
@@ -323,9 +579,12 @@ function MobileMapScreen() {
                       {selectedMarker.category}
                     </Text>
                   </View>
-                  <TouchableOpacity onPress={() => setShowPreview(false)}>
-                    <Ionicons name="close" size={24} color="#666" />
-                  </TouchableOpacity>
+                  <View style={styles.previewActions}>
+                    <ShareButton deal={selectedMarker} style={styles.shareButton} />
+                    <TouchableOpacity onPress={() => setShowPreview(false)}>
+                      <Ionicons name="close" size={24} color="#666" />
+                    </TouchableOpacity>
+                  </View>
                 </View>
                 
                 <Text style={styles.previewTitle}>{selectedMarker.title}</Text>
@@ -369,99 +628,70 @@ function MobileMapScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 매장 추천 모달 */}
+      {showRecommendModal && (
+        <StoreRecommendation onClose={() => setShowRecommendModal(false)} />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f0fdf4', // Light green background
+  buttonGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  header: {
-    backgroundColor: '#22c55e', // Green header
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+  actionButton: {
+    backgroundColor: '#e03131',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  actionButtonText: {
     color: '#ffffff',
-    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 8,
   },
-  subTitle: {
-    fontSize: 16,
-    color: '#dcfce7', // Light green text
-    marginBottom: 12,
+  iconButton: {
+    backgroundColor: '#e03131',
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  
-  // 버튼 행
-  buttonRow: {
+  previewActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    gap: 12,
   },
-  
-  // 웹 플레이스홀더
-  webPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    margin: 20,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: '#22c55e',
-    borderStyle: 'dashed',
-  },
-  webPlaceholderText: {
-    fontSize: 18,
-    color: '#166534',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  
-  // 지도 컨테이너
-  mapContainer: {
-    flex: 1,
-    margin: 20,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#22c55e',
-    position: 'relative',
-  },
-  map: {
-    flex: 1,
-  },
-  
-  // 알림 버튼
-  notificationButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+  shareButton: {
     marginRight: 8,
   },
-  notificationText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  
-  // 현재 위치 버튼 (지도 위 오버레이)
-  currentLocationButton: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
+  // 마커 스타일
+  customMarker: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#ffffff',
-    borderRadius: 25,
-    width: 50,
-    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -472,14 +702,221 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+    borderWidth: 2,
+    borderColor: '#e03131',
+  },
+  markerBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#e03131',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  markerBadgeText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  // 필터 관련 스타일
+  filterChips: {
+    marginBottom: 16,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  filterChipActive: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#e03131',
+  },
+  filterChipText: {
+    fontSize: 14,
+    color: '#495057',
+    marginLeft: 6,
+    fontWeight: '600',
+  },
+  filterChipTextActive: {
+    color: '#e03131',
+  },
+  // 검색 관련 스타일
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    height: 48,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#191f28',
+    paddingVertical: 8,
+    fontWeight: '500',
+  },
+  clearButton: {
+    padding: 8,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f5',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#191f28',
+    marginBottom: 4,
+  },
+  subTitle: {
+    fontSize: 15,
+    color: '#8b95a1',
+    marginBottom: 16,
+    fontWeight: '500',
+  },
+  
+  // 버튼 행
+  buttonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  
+  // 웹 플레이스홀더
+  webPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    margin: 16,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  webPlaceholderText: {
+    fontSize: 15,
+    color: '#8b95a1',
+    marginTop: 16,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  
+  // 지도 컨테이너
+  mapContainer: {
+    flex: 1,
+    margin: 16,
+    borderRadius: 24,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    position: 'relative',
+  },
+  map: {
+    flex: 1,
+  },
+  
+  // 알림 버튼
+  notificationButton: {
+    backgroundColor: '#f8f9fa',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  notificationText: {
+    color: '#191f28',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  
+  // 현재 위치 버튼 (지도 위 오버레이)
+  currentLocationButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
     zIndex: 1000,
   },
   
   // 새로고침 버튼
   refreshButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    padding: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 16,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   
   // 로딩 오버레이
@@ -489,108 +926,113 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(240, 253, 244, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#166534',
-    marginTop: 12,
-    fontWeight: 'bold',
+    fontSize: 15,
+    color: '#8b95a1',
+    marginTop: 16,
+    fontWeight: '500',
   },
   
   // 모달 스타일
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'flex-end',
   },
   previewCard: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
     maxHeight: '70%',
   },
   previewHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   categoryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8fdf8',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#dcfce7',
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   categoryText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    marginLeft: 4,
+    marginLeft: 6,
+    color: '#191f28',
   },
   previewTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#166534',
+    fontWeight: '700',
+    color: '#191f28',
     marginBottom: 8,
   },
   previewDescription: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 16,
+    fontSize: 15,
+    color: '#8b95a1',
+    marginBottom: 20,
+    lineHeight: 20,
   },
   priceSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   currentPrice: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#22c55e',
+    fontWeight: '700',
+    color: '#191f28',
     marginRight: 8,
   },
   originalPrice: {
-    fontSize: 16,
-    color: '#9ca3af',
+    fontSize: 15,
+    color: '#8b95a1',
     textDecorationLine: 'line-through',
     marginRight: 8,
   },
   discountBadge: {
-    backgroundColor: '#ef4444',
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    backgroundColor: '#e7f5ff',
+    color: '#228be6',
+    fontSize: 13,
+    fontWeight: '600',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   
   // 정보 섹션
   infoSection: {
-    marginBottom: 16,
+    marginBottom: 20,
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 16,
   },
   distanceText: {
-    fontSize: 14,
-    color: '#16a34a',
-    marginBottom: 4,
+    fontSize: 15,
+    color: '#191f28',
+    marginBottom: 8,
+    fontWeight: '500',
   },
   timeText: {
-    fontSize: 14,
-    color: '#ef4444',
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: 15,
+    color: '#228be6',
+    fontWeight: '600',
+    marginBottom: 8,
   },
   quantityText: {
-    fontSize: 14,
-    color: '#16a34a',
+    fontSize: 15,
+    color: '#191f28',
+    fontWeight: '500',
   },
   
   // 버튼 행
@@ -602,34 +1044,48 @@ const styles = StyleSheet.create({
   favoriteButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#ef4444',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
     flex: 1,
     marginRight: 8,
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   favoriteButtonText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginLeft: 4,
+    color: '#191f28',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   detailButton: {
-    backgroundColor: '#22c55e',
+    backgroundColor: '#228be6',
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 16,
     flex: 1,
     marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   detailButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 15,
+    fontWeight: '600',
     textAlign: 'center',
   },
 });

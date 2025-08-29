@@ -41,7 +41,7 @@
           "backgroundColor": "#f0fdf4"
         }
       ],
-      "expo-maps",
+
       [
         "expo-notifications",
         {

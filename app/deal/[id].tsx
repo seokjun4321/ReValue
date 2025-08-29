@@ -92,6 +92,7 @@ export default function DealDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [purchasing, setPurchasing] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [quantity, setQuantity] = useState(1);
   const { width } = Dimensions.get('window');
 
   useEffect(() => {
@@ -112,12 +113,21 @@ export default function DealDetailScreen() {
     }
   }, [id]);
 
+  const handleQuantityChange = (increment: boolean) => {
+    if (!deal) return;
+    
+    const newQuantity = increment ? quantity + 1 : quantity - 1;
+    if (newQuantity > 0 && newQuantity <= deal.remainingQuantity) {
+      setQuantity(newQuantity);
+    }
+  };
+
   const handlePurchase = () => {
     if (!deal) return;
 
     Alert.alert(
       "구매 확인",
-      `'${deal.title}' 상품을 ${deal.discountedPrice.toLocaleString()}원에 구매하시겠습니까?`,
+      `'${deal.title}' 상품을 ${quantity}개, 총 ${(deal.discountedPrice * quantity).toLocaleString()}원에 구매하시겠습니까?`,
       [
         { text: "취소", style: "cancel" },
         { text: "구매하기", onPress: () => processPurchase() }
@@ -141,10 +151,10 @@ export default function DealDetailScreen() {
         buyerId: auth.currentUser.uid,
         sellerId: deal.storeId,
         storeId: deal.storeId,
-        quantity: 1,
-        totalPrice: deal.discountedPrice,
-        originalPrice: deal.originalPrice,
-        savedAmount: deal.originalPrice - deal.discountedPrice,
+        quantity: quantity,
+        totalPrice: deal.discountedPrice * quantity,
+        originalPrice: deal.originalPrice * quantity,
+        savedAmount: (deal.originalPrice - deal.discountedPrice) * quantity,
         buyerContact: auth.currentUser.phoneNumber || auth.currentUser.email || '',
         reviewed: false
       };
@@ -276,6 +286,42 @@ export default function DealDetailScreen() {
               <Text style={styles.infoText}>남은 수량 <Text style={{fontWeight: 'bold'}}>{deal.remainingQuantity}개</Text></Text>
             </View>
           </View>
+
+          {/* 수량 선택 */}
+          <View style={styles.quantitySection}>
+            <Text style={styles.quantityLabel}>구매 수량</Text>
+            <View style={styles.quantityControls}>
+              <TouchableOpacity
+                style={[styles.quantityButton, quantity <= 1 && styles.quantityButtonDisabled]}
+                onPress={() => handleQuantityChange(false)}
+                disabled={quantity <= 1}
+              >
+                <Ionicons name="remove" size={20} color={quantity <= 1 ? "#9ca3af" : "#22c55e"} />
+              </TouchableOpacity>
+              
+              <Text style={styles.quantityText}>{quantity}</Text>
+              
+              <TouchableOpacity
+                style={[styles.quantityButton, quantity >= deal.remainingQuantity && styles.quantityButtonDisabled]}
+                onPress={() => handleQuantityChange(true)}
+                disabled={quantity >= deal.remainingQuantity}
+              >
+                <Ionicons name="add" size={20} color={quantity >= deal.remainingQuantity ? "#9ca3af" : "#22c55e"} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* 총 금액 */}
+          <View style={styles.totalSection}>
+            <Text style={styles.totalLabel}>총 금액</Text>
+            <View style={styles.totalRow}>
+              <Text style={styles.totalPrice}>{(deal.discountedPrice * quantity).toLocaleString()}원</Text>
+              <Text style={styles.totalOriginalPrice}>{(deal.originalPrice * quantity).toLocaleString()}원</Text>
+            </View>
+            <Text style={styles.savedAmount}>
+              {((deal.originalPrice - deal.discountedPrice) * quantity).toLocaleString()}원 절약
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -301,6 +347,85 @@ export default function DealDetailScreen() {
 
 
 const styles = StyleSheet.create({
+  // 수량 선택 섹션
+  quantitySection: {
+    marginTop: 24,
+    marginBottom: 16,
+    backgroundColor: '#f0fdf4',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#dcfce7',
+  },
+  quantityLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#166534',
+    marginBottom: 12,
+  },
+  quantityControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#22c55e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quantityButtonDisabled: {
+    borderColor: '#e5e7eb',
+    backgroundColor: '#f9fafb',
+  },
+  quantityText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#166534',
+    marginHorizontal: 24,
+  },
+
+  // 총 금액 섹션
+  totalSection: {
+    marginTop: 8,
+    marginBottom: 24,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 4,
+  },
+  totalPrice: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#166534',
+    marginRight: 8,
+  },
+  totalOriginalPrice: {
+    fontSize: 16,
+    color: '#9ca3af',
+    textDecorationLine: 'line-through',
+  },
+  savedAmount: {
+    fontSize: 14,
+    color: '#ef4444',
+    fontWeight: '600',
+  },
    // The main container for the slider and dots
   imageSliderContainer: {
     height: 300, // Or whatever height you prefer

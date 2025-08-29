@@ -102,11 +102,24 @@ export async function showLocalNotification(title: string, body: string, data?: 
  * 떨이 관련 알림 타입들
  */
 export const NOTIFICATION_TYPES = {
+  // 떨이 관련
   NEW_DEAL_NEARBY: 'new_deal_nearby',
   DEAL_EXPIRING: 'deal_expiring', 
   FAVORITE_STORE_UPDATE: 'favorite_store_update',
+  PRICE_DROP: 'price_drop',
+  LAST_MINUTE_DEAL: 'last_minute_deal',
+
+  // 주문 관련
   ORDER_STATUS_UPDATE: 'order_status_update',
-  PRICE_DROP: 'price_drop'
+  ORDER_CONFIRMED: 'order_confirmed',
+  ORDER_READY: 'order_ready',
+  PICKUP_REMINDER: 'pickup_reminder',
+  ARRIVAL_REMINDER: 'arrival_reminder',
+
+  // 매장 관련
+  STORE_NEW_DEAL: 'store_new_deal',
+  STORE_SPECIAL_OFFER: 'store_special_offer',
+  FREQUENT_STORE_UPDATE: 'frequent_store_update'
 } as const;
 
 export type NotificationType = typeof NOTIFICATION_TYPES[keyof typeof NOTIFICATION_TYPES];
@@ -119,12 +132,15 @@ export async function sendDealNotification(
   dealTitle: string,
   storeName: string,
   distance?: string,
-  discountRate?: number
+  discountRate?: number,
+  pickupTime?: string,
+  arrivalTime?: string
 ) {
   let title = '';
   let body = '';
 
   switch (type) {
+    // 떨이 관련 알림
     case NOTIFICATION_TYPES.NEW_DEAL_NEARBY:
       title = '🎯 새로운 떨이 발견!';
       body = `${storeName}에서 ${dealTitle}을(를) ${distance}에서 발견했어요!`;
@@ -144,6 +160,48 @@ export async function sendDealNotification(
       title = '💰 가격 인하!';
       body = `${dealTitle}의 할인율이 ${discountRate}%로 올랐어요!`;
       break;
+
+    case NOTIFICATION_TYPES.LAST_MINUTE_DEAL:
+      title = '⚡ 긴급 할인!';
+      body = `${storeName}의 ${dealTitle}이(가) ${discountRate}% 특별 할인 중!`;
+      break;
+
+    // 주문 관련 알림
+    case NOTIFICATION_TYPES.ORDER_CONFIRMED:
+      title = '✅ 주문 확인';
+      body = `${storeName}에서 주문이 확인되었습니다. 픽업 시간: ${pickupTime}`;
+      break;
+
+    case NOTIFICATION_TYPES.ORDER_READY:
+      title = '🎉 주문 준비 완료';
+      body = `${storeName}에서 주문하신 ${dealTitle}이(가) 준비되었습니다!`;
+      break;
+
+    case NOTIFICATION_TYPES.PICKUP_REMINDER:
+      title = '⏰ 픽업 시간 알림';
+      body = `${storeName}에서 ${pickupTime}에 픽업 예정입니다. 잊지 마세요!`;
+      break;
+
+    case NOTIFICATION_TYPES.ARRIVAL_REMINDER:
+      title = '🚶‍♂️ 도착 시간 알림';
+      body = `${storeName}까지 도보로 ${arrivalTime} 남았습니다.`;
+      break;
+
+    // 매장 관련 알림
+    case NOTIFICATION_TYPES.STORE_NEW_DEAL:
+      title = '🆕 새로운 떨이';
+      body = `자주 방문하는 ${storeName}에 새로운 떨이가 등록되었어요!`;
+      break;
+
+    case NOTIFICATION_TYPES.STORE_SPECIAL_OFFER:
+      title = '🎁 특별 할인';
+      body = `${storeName}에서 특별 할인 이벤트를 진행 중입니다!`;
+      break;
+
+    case NOTIFICATION_TYPES.FREQUENT_STORE_UPDATE:
+      title = '👋 단골 매장 소식';
+      body = `${storeName}에 새로운 소식이 있어요!`;
+      break;
       
     default:
       title = 'ReValue 알림';
@@ -156,7 +214,18 @@ export async function sendDealNotification(
     storeName,
     distance,
     discountRate,
-    timestamp: Date.now()
+    pickupTime,
+    arrivalTime,
+    timestamp: Date.now(),
+    data: {
+      type,
+      dealId: dealTitle, // TODO: 실제 dealId로 변경
+      storeId: storeName, // TODO: 실제 storeId로 변경
+      orderId: type.includes('ORDER') ? 'temp-order-id' : undefined, // TODO: 실제 orderId로 변경
+      discountRate,
+      pickupTime,
+      arrivalTime
+    }
   });
 }
 
@@ -210,12 +279,43 @@ export function addNotificationListeners() {
     const data = response.notification.request.content.data;
     
     // 알림 타입에 따른 네비게이션 처리
-    if (data.type === NOTIFICATION_TYPES.NEW_DEAL_NEARBY) {
-      // 지도 화면으로 이동
-      console.log('지도 화면으로 이동');
-    } else if (data.type === NOTIFICATION_TYPES.DEAL_EXPIRING) {
-      // 찜 화면으로 이동
-      console.log('찜 화면으로 이동');
+    switch (data.type) {
+      // 떨이 관련
+      case NOTIFICATION_TYPES.NEW_DEAL_NEARBY:
+      case NOTIFICATION_TYPES.LAST_MINUTE_DEAL:
+        // 지도 화면으로 이동하여 해당 위치 표시
+        console.log('지도 화면으로 이동', { dealId: data.dealId, storeId: data.storeId });
+        break;
+
+      case NOTIFICATION_TYPES.DEAL_EXPIRING:
+        // 찜 화면으로 이동
+        console.log('찜 화면으로 이동', { dealId: data.dealId });
+        break;
+
+      // 주문 관련
+      case NOTIFICATION_TYPES.ORDER_CONFIRMED:
+      case NOTIFICATION_TYPES.ORDER_READY:
+      case NOTIFICATION_TYPES.PICKUP_REMINDER:
+        // 주문 상세 화면으로 이동
+        console.log('주문 상세 화면으로 이동', { orderId: data.orderId });
+        break;
+
+      case NOTIFICATION_TYPES.ARRIVAL_REMINDER:
+        // 지도 화면으로 이동하여 경로 표시
+        console.log('지도 화면으로 이동 (경로 표시)', { storeId: data.storeId });
+        break;
+
+      // 매장 관련
+      case NOTIFICATION_TYPES.STORE_NEW_DEAL:
+      case NOTIFICATION_TYPES.STORE_SPECIAL_OFFER:
+      case NOTIFICATION_TYPES.FREQUENT_STORE_UPDATE:
+        // 매장 상세 화면으로 이동
+        console.log('매장 상세 화면으로 이동', { storeId: data.storeId });
+        break;
+
+      default:
+        // 홈 화면으로 이동
+        console.log('홈 화면으로 이동');
     }
   });
 

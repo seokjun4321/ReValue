@@ -10,15 +10,15 @@ export default function TabsLayout() {
           ? { display: 'none' }
           : {
               backgroundColor: '#ffffff',
-              borderTopColor: '#22c55e',
+              borderTopColor: '#e03131',
               borderTopWidth: 2,
-              shadowColor: '#16a34a',
+              shadowColor: '#c92a2a',
               shadowOffset: { width: 0, height: -2 },
               shadowOpacity: 0.1,
               shadowRadius: 8,
               elevation: 10,
             },
-        tabBarActiveTintColor: '#22c55e',
+        tabBarActiveTintColor: '#e03131',
         tabBarInactiveTintColor: '#9ca3af',
         tabBarButton: route.name === 'index' ? () => null : undefined,
       })}
@@ -53,6 +53,16 @@ export default function TabsLayout() {
           title: '찜',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="heart" size={size} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="community"
+        options={{
+          title: '커뮤니티',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="people" size={size} color={color} />
           ),
         }}
       />

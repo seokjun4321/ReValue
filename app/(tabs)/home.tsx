@@ -7,7 +7,7 @@ import {
   TouchableOpacity, 
   RefreshControl, 
   ActivityIndicator,
-  Image,
+
   TextInput,
   Modal
 } from 'react-native';
@@ -25,6 +25,7 @@ import {
 import { Deal, Order, CategoryType, CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS } from '../../lib/types';
 import { auth } from '../../firebase';
 import "../global.css";
+import PersonalizedFeed from '../../components/PersonalizedFeed';
 
 export default function Home() {
   const router = useRouter();
@@ -143,9 +144,13 @@ export default function Home() {
   };
 
   // 마감 시간 포맷
-  const formatTimeUntilExpiry = (expiryDate: Date): string => {
+  const formatTimeUntilExpiry = (expiryDate: any): string => {
+    if (!expiryDate) return "마감됨";
+    
+    // Firestore Timestamp를 Date 객체로 변환
+    const expiry = expiryDate.toDate ? expiryDate.toDate() : new Date(expiryDate);
     const now = new Date();
-    const diff = expiryDate.getTime() - now.getTime();
+    const diff = expiry.getTime() - now.getTime();
     
     if (diff <= 0) return "마감됨";
     
@@ -163,15 +168,19 @@ export default function Home() {
   };
 
   // 주문 날짜 포맷
-  const formatOrderDate = (date: Date): string => {
+  const formatOrderDate = (date: any): string => {
+    if (!date) return '';
+    
+    // Firestore Timestamp를 Date 객체로 변환
+    const orderDate = date.toDate ? date.toDate() : new Date(date);
     const now = new Date();
-    const diff = now.getTime() - date.getTime();
+    const diff = now.getTime() - orderDate.getTime();
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
     
     if (days === 0) return "오늘";
     if (days === 1) return "어제";
     if (days < 7) return `${days}일 전`;
-    return date.toLocaleDateString();
+    return orderDate.toLocaleDateString();
   };
 
   // 검색 실행
@@ -229,27 +238,177 @@ export default function Home() {
     <View style={styles.container}>
       {/* 헤더 */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>ReValue</Text>
-        <Text style={styles.subTitle}>오늘의 떨이를 찾아보세요!</Text>
+        <View style={styles.headerTop}>
+          <Text style={styles.headerTitle}>ReValue</Text>
+          <TouchableOpacity style={styles.notificationButton}>
+            <Ionicons name="notifications-outline" size={24} color="#e03131" />
+            <View style={styles.notificationBadge} />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.subTitle}>환경을 생각하는 똑똑한 소비</Text>
       </View>
 
       <ScrollView 
         style={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e03131" />
         }
         showsVerticalScrollIndicator={false}
       >
         {/* 환영 섹션 */}
         <View style={styles.welcomeSection}>
           <View style={styles.welcomeContent}>
-            <Text style={styles.welcomeTitle}>🎯 떨이 헌터님, 안녕하세요!</Text>
-            <Text style={styles.welcomeText}>주변 매장의 특가 상품을 찾아보세요</Text>
+            <Text style={styles.welcomeTitle}>
+              {auth.currentUser ? `${auth.currentUser.displayName || '떨이 헌터'}님,` : '안녕하세요!'} 
+            </Text>
+            <Text style={styles.welcomeText}>오늘은 어떤 가치를 발견하시겠어요?</Text>
           </View>
           <TouchableOpacity style={styles.actionButton} onPress={openSearchModal}>
-            <Ionicons name="search" size={20} color="#22c55e" />
+            <Ionicons name="search" size={20} color="#e03131" />
             <Text style={styles.actionButtonText}>검색하기</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* 에코 임팩트 섹션 */}
+        <View style={styles.ecoSection}>
+          <View style={styles.ecoHeader}>
+            <View>
+              <Text style={styles.ecoTitle}>🌱 나의 환경 보호 활동</Text>
+              <Text style={styles.ecoPoints}>{userStats?.ecoPoints || 0} 포인트</Text>
+            </View>
+            <TouchableOpacity style={styles.ecoHistoryButton}>
+              <Text style={styles.ecoHistoryText}>전체보기</Text>
+              <Ionicons name="chevron-forward" size={16} color="#2f9e44" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.ecoStatsScroll}
+          >
+            <View style={styles.ecoStatCard}>
+              <View style={[styles.ecoIcon, { backgroundColor: '#ebfbee' }]}>
+                <Ionicons name="leaf" size={24} color="#2f9e44" />
+              </View>
+              <Text style={styles.ecoStatValue}>
+                {(userStats?.ecoImpact?.co2Reduced || 0).toFixed(1)}kg
+              </Text>
+              <Text style={styles.ecoStatLabel}>감소된 CO2</Text>
+            </View>
+
+            <View style={styles.ecoStatCard}>
+              <View style={[styles.ecoIcon, { backgroundColor: '#fff9db' }]}>
+                <Ionicons name="water" size={24} color="#f59f00" />
+              </View>
+              <Text style={styles.ecoStatValue}>
+                {(userStats?.ecoImpact?.waterSaved || 0).toFixed(1)}L
+              </Text>
+              <Text style={styles.ecoStatLabel}>절약한 물</Text>
+            </View>
+
+            <View style={styles.ecoStatCard}>
+              <View style={[styles.ecoIcon, { backgroundColor: '#fff5f5' }]}>
+                <Ionicons name="trash-bin" size={24} color="#e03131" />
+              </View>
+              <Text style={styles.ecoStatValue}>
+                {(userStats?.ecoImpact?.plasticReduced || 0).toFixed(1)}kg
+              </Text>
+              <Text style={styles.ecoStatLabel}>절약한 플라스틱</Text>
+            </View>
+
+            <View style={styles.ecoStatCard}>
+              <View style={[styles.ecoIcon, { backgroundColor: '#e7f5ff' }]}>
+                <Ionicons name="leaf" size={24} color="#228be6" />
+              </View>
+              <Text style={styles.ecoStatValue}>
+                {userStats?.plantedTrees || 0}그루
+              </Text>
+              <Text style={styles.ecoStatLabel}>심은 나무</Text>
+            </View>
+          </ScrollView>
+
+
+
+          {/* 나무 심기 프로젝트 */}
+          <TouchableOpacity style={styles.treeProjectCard}>
+            <View style={[styles.treeProjectImage, { backgroundColor: '#ebfbee' }]}>
+              <Ionicons name="leaf" size={48} color="#2f9e44" />
+            </View>
+            <View style={styles.treeProjectContent}>
+              <View style={styles.treeProjectHeader}>
+                <Text style={styles.treeProjectTitle}>🌳 나무 심기 프로젝트</Text>
+                <Text style={styles.treeProjectProgress}>75%</Text>
+              </View>
+              <Text style={styles.treeProjectDesc}>
+                1,000그루 목표 달성까지 250그루 남았어요!
+              </Text>
+              <View style={styles.treeProgressBar}>
+                <View style={[styles.treeProgressFill, { width: '75%' }]} />
+              </View>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* 개인화된 추천 섹션 */}
+        {auth.currentUser && (
+          <PersonalizedFeed userId={auth.currentUser.uid} />
+        )}
+
+        {/* 실시간 인기 섹션 */}
+        <View style={styles.trendingSection}>
+          <Text style={styles.personalTitle}>🔥 실시간 인기 떨이</Text>
+          {popularDeals.slice(0, 3).map((deal: Deal) => (
+            <TouchableOpacity
+              key={deal.id}
+              style={styles.trendingCard}
+              onPress={() => router.push(`/deal/${deal.id}`)}
+            >
+              <View style={styles.trendingHeader}>
+                <Text style={styles.trendingTitle}>{deal.title}</Text>
+                <Text style={styles.dealDiscount}>{deal.discountRate}% 할인</Text>
+              </View>
+              <View style={styles.trendingContent}>
+                <View style={styles.dealPriceContainer}>
+                  <Text style={styles.dealPrice}>{deal.discountedPrice.toLocaleString()}원</Text>
+                  <Text style={styles.dealOriginalPrice}>{deal.originalPrice.toLocaleString()}원</Text>
+                </View>
+                <Text style={styles.dealStore}>{deal.storeName}</Text>
+                <View style={styles.countdownContainer}>
+                  <Ionicons name="time" size={20} color="#e03131" />
+                  <Text style={styles.countdownText}>
+                    {formatTimeUntilExpiry(deal.expiryDate)} • 남은 수량 {deal.remainingQuantity}개
+                  </Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* 스토리 섹션 */}
+        <View style={styles.storySection}>
+          <Text style={styles.personalTitle}>✨ 오늘의 스토리</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.storyScroll}
+          >
+            {popularDeals.map((deal: Deal) => (
+              <TouchableOpacity
+                key={deal.id}
+                style={styles.storyCard}
+                onPress={() => router.push(`/deal/${deal.id}`)}
+              >
+                <View style={styles.storyImageRing}>
+                  <View style={[styles.storyImage, { backgroundColor: '#fff5f5', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Ionicons name="image" size={40} color="#ffa8a8" />
+                  </View>
+                </View>
+                <Text style={styles.storyTitle} numberOfLines={1}>{deal.storeName}</Text>
+                <Text style={styles.storySubtitle}>신선도 인증</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
         {/* 카테고리 섹션 */}
@@ -264,7 +423,7 @@ export default function Home() {
                 ]}
                 onPress={() => handleCategorySelect('all')}
               >
-                <Ionicons name="apps" size={24} color={selectedCategory === 'all' ? '#ffffff' : '#22c55e'} />
+                <Ionicons name="apps" size={24} color={selectedCategory === 'all' ? '#228be6' : '#4a5568'} />
                 <Text style={[
                   styles.categoryButtonText,
                   selectedCategory === 'all' && styles.categoryButtonTextActive
@@ -283,12 +442,11 @@ export default function Home() {
                   <Ionicons 
                     name={CATEGORY_ICONS[key as CategoryType] as any} 
                     size={24} 
-                    color={selectedCategory === key ? '#ffffff' : CATEGORY_COLORS[key as CategoryType]} 
+                    color={selectedCategory === key ? '#e03131' : '#495057'} 
                   />
                   <Text style={[
                     styles.categoryButtonText,
-                    selectedCategory === key && styles.categoryButtonTextActive,
-                    { color: selectedCategory === key ? '#ffffff' : CATEGORY_COLORS[key as CategoryType] }
+                    selectedCategory === key && styles.categoryButtonTextActive
                   ]}>{label}</Text>
                 </TouchableOpacity>
               ))}
@@ -309,7 +467,7 @@ export default function Home() {
 
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#22c55e" />
+              <ActivityIndicator size="large" color="#228be6" />
               <Text style={styles.loadingText}>떨이를 찾는 중...</Text>
             </View>
           ) : todaysDeals.length === 0 ? (
@@ -328,16 +486,9 @@ export default function Home() {
       style={styles.dealCard}
       onPress={() => router.push(`/deal/${deal.id}`)} // 이 부분을 추가!
     >
-      {deal.images && deal.images.length > 0 ? (
-      <Image
-        source={{ uri: `data:image/jpeg;base64,${deal.images[0]}` }}
-        style={styles.dealImage}
-      />
-    ) : (
-      <View style={styles.dealImagePlaceholder}>
-        <Ionicons name="image" size={40} color="#dcfce7" />
-      </View>
-    )}
+                        <View style={styles.dealImagePlaceholder}>
+                    <Ionicons name="image" size={40} color="#dcfce7" />
+                  </View>
       <View style={styles.dealInfo}>
         <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
         <Text style={styles.dealStore}>{deal.storeName}</Text>
@@ -360,7 +511,7 @@ export default function Home() {
         {recentOrders.length > 0 && (
           <View style={styles.recentSection}>
             <Text style={styles.sectionTitle}>📦 최근 거래</Text>
-            {recentOrders.map((order) => (
+                          {recentOrders.map((order: Order) => (
               <View key={order.id} style={styles.orderItem}>
                 <View style={styles.orderInfo}>
                   <Text style={styles.orderTitle}>{order.dealTitle}</Text>
@@ -387,7 +538,7 @@ export default function Home() {
           {/* 검색 헤더 */}
           <View style={styles.searchHeader}>
             <TouchableOpacity onPress={closeSearchModal} style={styles.searchCloseButton}>
-              <Ionicons name="arrow-back" size={24} color="#22c55e" />
+              <Ionicons name="arrow-back" size={24} color="#228be6" />
             </TouchableOpacity>
             <Text style={styles.searchHeaderTitle}>떨이 검색</Text>
             <View style={styles.searchHeaderRight} />
@@ -419,7 +570,7 @@ export default function Home() {
           <ScrollView style={styles.searchResults} showsVerticalScrollIndicator={false}>
             {searchLoading ? (
               <View style={styles.searchLoadingContainer}>
-                <ActivityIndicator size="large" color="#22c55e" />
+                <ActivityIndicator size="large" color="#228be6" />
                 <Text style={styles.searchLoadingText}>검색 중...</Text>
               </View>
             ) : searchTerm.length === 0 ? (
@@ -443,7 +594,7 @@ export default function Home() {
                 <Text style={styles.searchResultsHeader}>
                   검색 결과 {searchResults.length}개
                 </Text>
-                {searchResults.map((deal) => (
+                {searchResults.map((deal: Deal) => (
                   <TouchableOpacity
                     key={deal.id}
                     style={styles.searchResultItem}
@@ -452,16 +603,9 @@ export default function Home() {
                       router.push(`/deal/${deal.id}`);
                     }}
                   >
-                    {deal.images && deal.images.length > 0 ? (
-                      <Image
-                        source={{ uri: `data:image/jpeg;base64,${deal.images[0]}` }}
-                        style={styles.searchResultImage}
-                      />
-                    ) : (
-                      <View style={styles.searchResultImagePlaceholder}>
-                        <Ionicons name="image" size={32} color="#dcfce7" />
-                      </View>
-                    )}
+                    <View style={styles.searchResultImagePlaceholder}>
+                      <Ionicons name="image" size={32} color="#dcfce7" />
+                    </View>
                     <View style={styles.searchResultInfo}>
                       <Text style={styles.searchResultTitle} numberOfLines={2}>
                         {deal.title}
@@ -496,23 +640,375 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fdf8', // Light green background
+    backgroundColor: '#ffffff',
   },
   header: {
-    backgroundColor: '#22c55e', // Green header
+    backgroundColor: '#ffffff',
     paddingTop: 50,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fff5f5',
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   headerTitle: {
     fontSize: 28,
-    fontWeight: 'bold',
-    color: '#ffffff',
+    fontWeight: '700',
+    color: '#e03131',
+  },
+  notificationButton: {
+    position: 'relative',
+    padding: 8,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#e03131',
+  },
+  subTitle: {
+    fontSize: 15,
+    color: '#495057',
+    fontWeight: '500',
+  },
+  content: {
+    flex: 1,
+  },
+  welcomeSection: {
+    backgroundColor: '#fff5f5',
+    margin: 20,
+    borderRadius: 24,
+    padding: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  welcomeContent: {
+    flex: 1,
+  },
+  welcomeTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#e03131',
+    marginBottom: 6,
+  },
+  welcomeText: {
+    fontSize: 15,
+    color: '#495057',
+    fontWeight: '500',
+  },
+  actionButton: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  actionButtonText: {
+    color: '#e03131',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  // 에코 섹션 스타일
+  ecoSection: {
+    margin: 20,
+    marginTop: 0,
+  },
+  ecoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  ecoTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#191f28',
+    marginBottom: 8,
+  },
+  ecoPointsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ecoPoints: {
+    fontSize: 18,
+    color: '#e03131',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  ecoHistoryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff5f5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 12,
+  },
+  ecoHistoryText: {
+    fontSize: 14,
+    color: '#e03131',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  ecoStatsScroll: {
+    marginBottom: 20,
+  },
+  ecoStatsContent: {
+    paddingHorizontal: 4,
+  },
+  ecoStatCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    marginHorizontal: 8,
+    width: 140,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  ecoIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  ecoStatValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#191f28',
+    marginBottom: 6,
+  },
+  ecoStatLabel: {
+    fontSize: 14,
+    color: '#868e96',
+    fontWeight: '500',
+  },
+
+  treeProjectCard: {
+    backgroundColor: '#fff5f5',
+    margin: 20,
+    marginTop: 0,
+    borderRadius: 24,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  treeProjectContent: {
+    padding: 24,
+  },
+  treeProjectHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  treeProjectTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  treeProjectTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#191f28',
+    marginLeft: 8,
+  },
+  treeProjectProgress: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#e03131',
+  },
+  treeProjectDesc: {
+    fontSize: 15,
+    color: '#495057',
+    marginBottom: 20,
+    fontWeight: '500',
+  },
+  treeProgressBar: {
+    height: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  treeProgressFill: {
+    height: '100%',
+    backgroundColor: '#e03131',
+    borderRadius: 6,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  header: {
+    backgroundColor: '#ffffff',
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#fff5f5',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#e03131',
     marginBottom: 4,
   },
   subTitle: {
-    fontSize: 16,
-    color: '#dcfce7', // Light green text
+    fontSize: 15,
+    color: '#495057',
+    fontWeight: '500',
+  },
+  // 개인화된 추천 섹션
+  personalSection: {
+    marginBottom: 24,
+  },
+  personalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#191f28',
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  personalScroll: {
+    paddingLeft: 20,
+  },
+  personalCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 20,
+    marginRight: 16,
+    width: 280,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  personalBadge: {
+    backgroundColor: '#fff5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+  },
+  personalBadgeText: {
+    color: '#e03131',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  // 실시간 인기 섹션
+  trendingSection: {
+    marginBottom: 24,
+    paddingHorizontal: 20,
+  },
+  trendingCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    overflow: 'hidden',
+  },
+  trendingHeader: {
+    backgroundColor: '#fff5f5',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  trendingTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#e03131',
+  },
+  trendingContent: {
+    padding: 20,
+  },
+  countdownContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    backgroundColor: '#fff5f5',
+    padding: 12,
+    borderRadius: 16,
+  },
+  countdownText: {
+    color: '#e03131',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  // 스토리 섹션
+  storySection: {
+    marginBottom: 24,
+  },
+  storyScroll: {
+    paddingLeft: 20,
+  },
+  storyCard: {
+    width: 140,
+    marginRight: 12,
+  },
+  storyImage: {
+    width: 140,
+    height: 140,
+    borderRadius: 20,
+    marginBottom: 8,
+  },
+  storyImageRing: {
+    padding: 3,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: '#e03131',
+  },
+  storyTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#191f28',
+    textAlign: 'center',
+  },
+  storySubtitle: {
+    fontSize: 12,
+    color: '#868e96',
+    textAlign: 'center',
+    marginTop: 2,
   },
   content: {
     flex: 1,
@@ -531,90 +1027,99 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   welcomeSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#22c55e',
+    backgroundColor: '#fff5f5',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   welcomeContent: {
     flex: 1,
   },
   welcomeTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#166534',
-    marginBottom: 4,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#e03131',
+    marginBottom: 6,
   },
   welcomeText: {
-    fontSize: 14,
-    color: '#16a34a',
+    fontSize: 15,
+    color: '#495057',
+    fontWeight: '500',
   },
   actionButton: {
     backgroundColor: '#ffffff',
-    borderWidth: 2,
-    borderColor: '#22c55e',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   actionButtonText: {
-    color: '#22c55e',
-    fontWeight: 'bold',
-    marginLeft: 6,
+    color: '#e03131',
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   categorySection: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#166534',
-    marginBottom: 12,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#191f28',
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   categoryGrid: {
     flexDirection: 'row',
     paddingHorizontal: 4,
   },
   categoryButton: {
-    backgroundColor: '#f8fdf8',
-    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
     padding: 16,
     marginRight: 12,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#dcfce7',
-    minWidth: 80,
+    minWidth: 84,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   categoryButtonActive: {
-    backgroundColor: '#22c55e',
-    borderColor: '#22c55e',
+    backgroundColor: '#fff5f5',
   },
   categoryButtonText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
-    marginTop: 4,
-    color: '#166534',
+    marginTop: 6,
+    color: '#495057',
   },
   categoryButtonTextActive: {
-    color: '#ffffff',
+    color: '#e03131',
   },
   todaysDealsSection: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#dcfce7',
-    shadowColor: '#16a34a',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -622,118 +1127,131 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   moreButton: {
-    color: '#22c55e',
+    color: '#228be6',
+    fontSize: 14,
     fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 48,
   },
   loadingText: {
-    color: '#166534',
-    marginTop: 12,
-    fontSize: 16,
+    color: '#4a5568',
+    marginTop: 16,
+    fontSize: 15,
+    fontWeight: '500',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 48,
   },
   emptyStateText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#6b7280',
-    marginTop: 12,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#191f28',
+    marginTop: 16,
   },
   emptyStateSubText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    marginTop: 4,
+    fontSize: 15,
+    color: '#8b95a1',
+    marginTop: 8,
+    fontWeight: '500',
   },
   dealsContainer: {
     flexDirection: 'row',
     paddingHorizontal: 4,
   },
   dealCard: {
-    backgroundColor: '#f8fdf8',
-    borderRadius: 12,
-    padding: 16,
-    marginRight: 12,
-    width: 200,
-    borderWidth: 1,
-    borderColor: '#dcfce7',
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 20,
+    marginRight: 16,
+    width: 240,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   dealImagePlaceholder: {
-    height: 120,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 8,
+    height: 160,
+    backgroundColor: '#fff5f5',
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   dealInfo: {
     flex: 1,
   },
   dealTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#166534',
-    marginBottom: 4,
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#191f28',
+    marginBottom: 8,
+    lineHeight: 24,
   },
   dealStore: {
-    fontSize: 14,
-    color: '#16a34a',
-    marginBottom: 8,
+    fontSize: 15,
+    color: '#495057',
+    marginBottom: 16,
+    fontWeight: '500',
   },
   dealPriceContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'baseline',
+    marginBottom: 8,
   },
   dealPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#22c55e',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#e03131',
     marginRight: 8,
   },
   dealOriginalPrice: {
-    fontSize: 14,
-    color: '#9ca3af',
+    fontSize: 15,
+    color: '#868e96',
     textDecorationLine: 'line-through',
+    fontWeight: '500',
   },
   dealDiscount: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#ef4444',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#e03131',
+    marginBottom: 12,
   },
   dealDistance: {
-    fontSize: 12,
-    color: '#16a34a',
-    marginBottom: 2,
+    fontSize: 14,
+    color: '#495057',
+    marginBottom: 6,
+    fontWeight: '500',
   },
   dealTime: {
-    fontSize: 12,
-    color: '#ef4444',
+    fontSize: 14,
+    color: '#e03131',
     fontWeight: '600',
   },
   recentSection: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#dcfce7',
+    borderRadius: 24,
+    padding: 24,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   orderItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0fdf4',
+    borderBottomColor: '#f1f3f5',
   },
   orderInfo: {
     flex: 1,
@@ -741,31 +1259,34 @@ const styles = StyleSheet.create({
   orderTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#166534',
-    marginBottom: 4,
+    color: '#191f28',
+    marginBottom: 6,
+    lineHeight: 22,
   },
   orderDate: {
-    fontSize: 12,
-    color: '#9ca3af',
+    fontSize: 13,
+    color: '#8b95a1',
+    fontWeight: '500',
   },
   orderPrice: {
     alignItems: 'flex-end',
   },
   itemPrice: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#22c55e',
-    marginBottom: 2,
+    fontWeight: '700',
+    color: '#191f28',
+    marginBottom: 4,
   },
   orderStatus: {
-    fontSize: 12,
-    color: '#16a34a',
+    fontSize: 13,
+    color: '#4a5568',
+    fontWeight: '500',
   },
 
   // 검색 모달 스타일
   searchModalContainer: {
     flex: 1,
-    backgroundColor: '#f8fdf8',
+    backgroundColor: '#f8f9fa',
   },
   searchHeader: {
     backgroundColor: '#ffffff',
@@ -776,15 +1297,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 15,
     borderBottomWidth: 1,
-    borderBottomColor: '#dcfce7',
+    borderBottomColor: '#f1f3f5',
   },
   searchCloseButton: {
     padding: 8,
   },
   searchHeaderTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#166534',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#191f28',
   },
   searchHeaderRight: {
     width: 40,
@@ -793,22 +1314,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#dcfce7',
+    borderBottomColor: '#f1f3f5',
   },
   searchInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0fdf4',
-    borderRadius: 12,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#dcfce7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: '#374151',
+    color: '#191f28',
     marginLeft: 8,
     marginRight: 8,
   },
@@ -822,9 +1346,10 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   searchLoadingText: {
-    fontSize: 16,
-    color: '#166534',
-    marginTop: 12,
+    fontSize: 15,
+    color: '#4a5568',
+    marginTop: 16,
+    fontWeight: '500',
   },
   searchEmptyState: {
     alignItems: 'center',
@@ -832,84 +1357,91 @@ const styles = StyleSheet.create({
     paddingVertical: 80,
   },
   searchEmptyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#374151',
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#191f28',
     marginTop: 16,
     marginBottom: 8,
   },
   searchEmptyDescription: {
-    fontSize: 14,
-    color: '#9ca3af',
+    fontSize: 15,
+    color: '#8b95a1',
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 22,
+    fontWeight: '500',
   },
   searchResultsList: {
     paddingBottom: 20,
   },
   searchResultsHeader: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#166534',
+    fontWeight: '700',
+    color: '#191f28',
     marginBottom: 16,
   },
   searchResultItem: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
-    borderWidth: 1,
-    borderColor: '#dcfce7',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   searchResultImagePlaceholder: {
     width: 80,
     height: 80,
-    backgroundColor: '#f0fdf4',
-    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 16,
   },
   searchResultInfo: {
     flex: 1,
   },
   searchResultTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#166534',
-    marginBottom: 4,
+    fontWeight: '600',
+    color: '#191f28',
+    marginBottom: 6,
+    lineHeight: 22,
   },
   searchResultStore: {
     fontSize: 14,
-    color: '#16a34a',
-    marginBottom: 8,
+    color: '#4a5568',
+    marginBottom: 12,
+    fontWeight: '500',
   },
   searchResultPriceContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'baseline',
+    marginBottom: 6,
   },
   searchResultPrice: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#22c55e',
+    fontWeight: '700',
+    color: '#191f28',
     marginRight: 8,
   },
   searchResultOriginalPrice: {
-    fontSize: 12,
-    color: '#9ca3af',
+    fontSize: 14,
+    color: '#8b95a1',
     textDecorationLine: 'line-through',
     marginRight: 8,
+    fontWeight: '500',
   },
   searchResultDiscount: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ef4444',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fa5252',
   },
   searchResultTime: {
-    fontSize: 12,
-    color: '#ef4444',
+    fontSize: 13,
+    color: '#fa5252',
     fontWeight: '600',
   },
 });
