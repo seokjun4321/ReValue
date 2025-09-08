@@ -173,7 +173,7 @@ export default function Profile() {
             <Text style={styles.userName}>
               {user?.displayName || user?.email?.split('@')[0] || '사용자'}
             </Text>
-            <Ionicons name="pencil" size={16} color="#dc2626" />
+            <Ionicons name="pencil" size={16} color="#22c55e" />
           </TouchableOpacity>
 
           <Text style={styles.userEmail}>
@@ -184,17 +184,17 @@ export default function Profile() {
         {/* 통계 카드 */}
         <View style={styles.statsSection}>
           <View style={styles.statCard}>
-            <Ionicons name="leaf" size={24} color="#dc2626" />
+            <Ionicons name="leaf" size={24} color="#22c55e" />
             <Text style={styles.statValue}>12.3kg</Text>
             <Text style={styles.statLabel}>절약한 CO₂</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="bag" size={24} color="#dc2626" />
+            <Ionicons name="bag" size={24} color="#22c55e" />
             <Text style={styles.statValue}>47개</Text>
             <Text style={styles.statLabel}>구매한 떨이</Text>
           </View>
           <View style={styles.statCard}>
-            <Ionicons name="star" size={24} color="#dc2626" />
+            <Ionicons name="star" size={24} color="#22c55e" />
             <Text style={styles.statValue}>4.8</Text>
             <Text style={styles.statLabel}>평균 평점</Text>
           </View>
@@ -203,15 +203,15 @@ export default function Profile() {
         {/* 메뉴 섹션 */}
         <View style={styles.menuSection}>
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/history')}>
-            <Ionicons name="receipt" size={24} color="#dc2626" />
+            <Ionicons name="receipt" size={24} color="#22c55e" />
             <Text style={styles.menuText}>거래 내역</Text>
-            <Ionicons name="chevron-forward" size={20} color="#dc2626" />
+            <Ionicons name="chevron-forward" size={20} color="#22c55e" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/reviews')}>
-            <Ionicons name="star" size={24} color="#dc2626" />
+            <Ionicons name="star" size={24} color="#22c55e" />
             <Text style={styles.menuText}>내 후기</Text>
-            <Ionicons name="chevron-forward" size={20} color="#dc2626" />
+            <Ionicons name="chevron-forward" size={20} color="#22c55e" />
           </TouchableOpacity>
         </View>
 
@@ -223,10 +223,10 @@ export default function Profile() {
           >
             <View style={styles.sellerButtonContent}>
               <View style={styles.sellerButtonLeft}>
-                <Ionicons name="analytics" size={24} color="#dc2626" />
+                <Ionicons name="analytics" size={24} color="#22c55e" />
                 <Text style={styles.sellerButtonText}>판매자 대시보드</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#dc2626" />
+              <Ionicons name="chevron-forward" size={20} color="#22c55e" />
             </View>
           </TouchableOpacity>
           
@@ -236,10 +236,10 @@ export default function Profile() {
           >
             <View style={styles.sellerButtonContent}>
               <View style={styles.sellerButtonLeft}>
-                <Ionicons name="add-circle" size={24} color="#dc2626" />
+                <Ionicons name="add-circle" size={24} color="#22c55e" />
                 <Text style={styles.sellerButtonText}>떨이 등록</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color="#dc2626" />
+              <Ionicons name="chevron-forward" size={20} color="#22c55e" />
             </View>
           </TouchableOpacity>
         </View>
@@ -247,27 +247,27 @@ export default function Profile() {
         {/* 설정 메뉴 */}
         <View style={styles.menuSection}>
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings" size={24} color="#dc2626" />
+            <Ionicons name="settings" size={24} color="#22c55e" />
             <Text style={styles.menuText}>설정</Text>
-            <Ionicons name="chevron-forward" size={20} color="#dc2626" />
+            <Ionicons name="chevron-forward" size={20} color="#22c55e" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/notifications')}>
-            <Ionicons name="notifications" size={24} color="#dc2626" />
+            <Ionicons name="notifications" size={24} color="#22c55e" />
             <Text style={styles.menuText}>알림 설정</Text>
-            <Ionicons name="chevron-forward" size={20} color="#dc2626" />
+            <Ionicons name="chevron-forward" size={20} color="#22c55e" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/help')}>
-            <Ionicons name="help-circle" size={24} color="#dc2626" />
+            <Ionicons name="help-circle" size={24} color="#22c55e" />
             <Text style={styles.menuText}>도움말</Text>
-            <Ionicons name="chevron-forward" size={20} color="#dc2626" />
+            <Ionicons name="chevron-forward" size={20} color="#22c55e" />
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.menuItem} onPress={() => router.push('/about')}>
-            <Ionicons name="information-circle" size={24} color="#dc2626" />
+            <Ionicons name="information-circle" size={24} color="#22c55e" />
             <Text style={styles.menuText}>앱 정보</Text>
-            <Ionicons name="chevron-forward" size={20} color="#dc2626" />
+            <Ionicons name="chevron-forward" size={20} color="#22c55e" />
           </TouchableOpacity>
         </View>
 
@@ -277,7 +277,7 @@ export default function Profile() {
           onPress={handleLogout}
           disabled={loading}
         >
-          <Ionicons name="log-out" size={24} color="#dc2626" />
+          <Ionicons name="log-out" size={24} color="#22c55e" />
           <Text style={styles.logoutText}>
             {loading ? '로그아웃 중...' : '로그아웃'}
           </Text>
@@ -330,7 +330,7 @@ export default function Profile() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0fdf4',
   },
   content: {
     flex: 1,
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#dc2626',
+    backgroundColor: '#22c55e',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: '#dc2626',
+    backgroundColor: '#22c55e',
     width: 32,
     height: 32,
     borderRadius: 16,
@@ -465,11 +465,11 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   sellerButton: {
-    backgroundColor: '#fff8f8',
+    backgroundColor: '#f0fdf4',
     borderRadius: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#fee2e2',
+    borderColor: '#dcfce7',
   },
   sellerButtonContent: {
     flexDirection: 'row',
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
   },
   sellerButtonText: {
     fontSize: 16,
-    color: '#dc2626',
+    color: '#22c55e',
     fontWeight: '600',
     marginLeft: 12,
   },
@@ -491,16 +491,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff8f8',
+    backgroundColor: '#f0fdf4',
     padding: 16,
     margin: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#fee2e2',
+    borderColor: '#dcfce7',
   },
   logoutText: {
     fontSize: 16,
-    color: '#dc2626',
+    color: '#22c55e',
     fontWeight: '600',
     marginLeft: 8,
   },
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   confirmButton: {
-    backgroundColor: '#dc2626',
+    backgroundColor: '#22c55e',
   },
   cancelButtonText: {
     color: '#191f28',

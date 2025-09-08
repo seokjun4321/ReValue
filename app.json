@@ -50,12 +50,6 @@
           "defaultChannel": "default"
         }
       ],
-      [
-        "@react-native-google-signin/google-signin",
-        {
-          "iosUrlScheme": "com.googleusercontent.apps.816141764936-your-ios-client-id"
-        }
-      ],
       "expo-apple-authentication"
     ],
     "experiments": {

@@ -278,7 +278,7 @@ export default function DealDetailScreen() {
 
           <View style={styles.infoBox}>
             <View style={styles.infoRow}>
-              <Ionicons name="time-outline" size={20} color="#ef4444" />
+              <Ionicons name="time-outline" size={20} color="#22c55e" />
               <Text style={styles.infoText}>마감까지 <Text style={{fontWeight: 'bold'}}>{formatTimeUntilExpiry(deal.expiryDate)}</Text></Text>
             </View>
             <View style={styles.infoRow}>
@@ -327,7 +327,7 @@ export default function DealDetailScreen() {
 
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.favoriteButton}>
-          <Ionicons name="heart-outline" size={28} color="#ef4444" />
+          <Ionicons name="heart-outline" size={28} color="#22c55e" />
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.purchaseButton, purchasing && styles.disabledButton]} 
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   },
   savedAmount: {
     fontSize: 14,
-    color: '#ef4444',
+    color: '#22c55e',
     fontWeight: '600',
   },
    // The main container for the slider and dots
@@ -487,7 +487,7 @@ const styles = StyleSheet.create({
   storeName: { fontSize: 16, color: '#6b7280', marginBottom: 4 },
   title: { fontSize: 24, fontWeight: 'bold', color: '#166534', marginBottom: 16 },
   priceSection: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 20 },
-  discountRate: { fontSize: 28, fontWeight: 'bold', color: '#ef4444', marginRight: 8 },
+  discountRate: { fontSize: 28, fontWeight: 'bold', color: '#22c55e', marginRight: 8 },
   discountedPrice: { fontSize: 28, fontWeight: 'bold', color: '#166534', marginRight: 8 },
   originalPrice: { fontSize: 18, color: '#9ca3af', textDecorationLine: 'line-through' },
   description: { fontSize: 16, color: '#374151', lineHeight: 24, marginBottom: 24 },

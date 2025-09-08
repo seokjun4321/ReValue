@@ -190,7 +190,7 @@ export default function PersonalizedFeed({ userId }: PersonalizedFeedProps) {
           
           <View style={styles.dealFooter}>
             <View style={styles.timeLeft}>
-              <Ionicons name="time" size={14} color="#e03131" />
+              <Ionicons name="time" size={14} color="#22c55e" />
               <Text style={styles.timeLeftText}>
                 {hoursLeft > 0 ? `${hoursLeft}시간 ` : ''}{minutesLeft}분 남음
               </Text>
@@ -208,7 +208,7 @@ export default function PersonalizedFeed({ userId }: PersonalizedFeedProps) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#e03131" />
+        <ActivityIndicator size="large" color="#22c55e" />
       </View>
     );
   }
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   categoryChipSelected: {
-    backgroundColor: '#e03131',
+    backgroundColor: '#22c55e',
   },
   categoryIcon: {
     marginRight: 4,
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     right: 12,
-    backgroundColor: '#e03131',
+    backgroundColor: '#22c55e',
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 12,
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   discountedPrice: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e03131',
+    color: '#22c55e',
     marginRight: 8,
   },
   originalPrice: {
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   timeLeftText: {
     marginLeft: 4,
     fontSize: 14,
-    color: '#e03131',
+    color: '#22c55e',
     fontWeight: '500',
   },
   dealStats: {

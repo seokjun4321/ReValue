@@ -45,39 +45,39 @@ export const ACCESSIBILITY = {
   },
 };
 
-// 색상 대비 모드
+// 🥕 당근마켓 스타일 Green 컬러 스킴
 export const COLOR_SCHEMES = {
   LIGHT: {
     background: '#ffffff',
-    surface: '#f8f9fa',
-    primary: '#e03131',
-    primaryDark: '#c92a2a',
-    primaryLight: '#ff6b6b',
-    secondary: '#228be6',
-    text: '#191f28',
-    textSecondary: '#495057',
-    textTertiary: '#868e96',
-    border: '#f1f3f5',
-    error: '#fa5252',
-    success: '#40c057',
-    warning: '#fd7e14',
-    info: '#15aabf',
+    surface: '#f0fdf4',        // 매우 연한 Green 배경
+    primary: '#22c55e',        // 메인 Green (당근마켓 오렌지 → Green)
+    primaryDark: '#16a34a',    // 진한 Green
+    primaryLight: '#4ade80',   // 밝은 Green
+    secondary: '#64748b',      // 회색 보조색
+    text: '#0f172a',          // 진한 회색 텍스트
+    textSecondary: '#475569',  // 중간 회색 텍스트
+    textTertiary: '#94a3b8',   // 연한 회색 텍스트
+    border: '#e2e8f0',        // 연한 회색 테두리
+    error: '#ef4444',         // 에러 빨간색
+    success: '#22c55e',       // 성공 Green
+    warning: '#f59e0b',       // 경고 노란색
+    info: '#3b82f6',          // 정보 파란색
   },
   DARK: {
-    background: '#1a1b1e',
-    surface: '#26282b',
-    primary: '#ff6b6b',
-    primaryDark: '#fa5252',
-    primaryLight: '#ffa8a8',
-    secondary: '#74c0fc',
-    text: '#f8f9fa',
-    textSecondary: '#ced4da',
-    textTertiary: '#adb5bd',
-    border: '#343a40',
-    error: '#ff6b6b',
-    success: '#51cf66',
-    warning: '#ffd43b',
-    info: '#22b8cf',
+    background: '#0f172a',        // 다크 배경
+    surface: '#1e293b',          // 다크 서피스
+    primary: '#4ade80',          // 밝은 Green (다크모드용)
+    primaryDark: '#22c55e',      // 진한 Green
+    primaryLight: '#86efac',     // 더 밝은 Green
+    secondary: '#94a3b8',        // 회색 보조색
+    text: '#f8fafc',            // 밝은 텍스트
+    textSecondary: '#cbd5e1',    // 중간 밝은 텍스트
+    textTertiary: '#94a3b8',     // 연한 텍스트
+    border: '#334155',          // 다크 테두리
+    error: '#ef4444',           // 에러 빨간색
+    success: '#4ade80',         // 성공 밝은 Green
+    warning: '#f59e0b',         // 경고 노란색
+    info: '#3b82f6',            // 정보 파란색
   },
   HIGH_CONTRAST: {
     background: '#000000',

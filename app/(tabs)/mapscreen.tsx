@@ -20,6 +20,7 @@ import { Deal, CategoryType, CATEGORY_COLORS, CATEGORY_ICONS } from '../../lib/t
 import SmartSearch from '../../components/SmartSearch';
 import ShareButton from '../../components/ShareButton';
 import StoreRecommendation from '../../components/StoreRecommendation';
+import NaverMap from '../../components/NaverMap';
 import { sendDealNotification, NOTIFICATION_TYPES } from '../../lib/notifications';
 
 export default function MapScreen() {
@@ -45,8 +46,7 @@ export default function MapScreen() {
 
   // 모바일 전용 지도 컴포넌트
 function MobileMapScreen() {
-  const MapView = require('react-native-maps').default;
-  const { Marker } = require('react-native-maps');
+  // 네이버 지도 사용
   const [selectedMarker, setSelectedMarker] = useState<Deal | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [deals, setDeals] = useState<Deal[]>([]);
@@ -365,7 +365,7 @@ function MobileMapScreen() {
             style={[styles.filterChip, routeMode === 'commute' && styles.filterChipActive]}
             onPress={() => setRouteMode(routeMode === 'commute' ? null : 'commute')}
           >
-            <Ionicons name="subway" size={16} color={routeMode === 'commute' ? '#e03131' : '#495057'} />
+            <Ionicons name="subway" size={16} color={routeMode === 'commute' ? '#22c55e' : '#495057'} />
             <Text style={[styles.filterChipText, routeMode === 'commute' && styles.filterChipTextActive]}>
               출퇴근길
             </Text>
@@ -375,7 +375,7 @@ function MobileMapScreen() {
             style={[styles.filterChip, routeMode === 'nearby' && styles.filterChipActive]}
             onPress={() => setRouteMode(routeMode === 'nearby' ? null : 'nearby')}
           >
-            <Ionicons name="walk" size={16} color={routeMode === 'nearby' ? '#e03131' : '#495057'} />
+            <Ionicons name="walk" size={16} color={routeMode === 'nearby' ? '#22c55e' : '#495057'} />
             <Text style={[styles.filterChipText, routeMode === 'nearby' && styles.filterChipTextActive]}>
               5분 거리
             </Text>
@@ -385,7 +385,7 @@ function MobileMapScreen() {
             style={[styles.filterChip, selectedFilter === 'new' && styles.filterChipActive]}
             onPress={() => setSelectedFilter(selectedFilter === 'new' ? null : 'new')}
           >
-            <Ionicons name="star" size={16} color={selectedFilter === 'new' ? '#e03131' : '#495057'} />
+            <Ionicons name="star" size={16} color={selectedFilter === 'new' ? '#22c55e' : '#495057'} />
             <Text style={[styles.filterChipText, selectedFilter === 'new' && styles.filterChipTextActive]}>
               신규 매장
             </Text>
@@ -395,7 +395,7 @@ function MobileMapScreen() {
             style={[styles.filterChip, selectedFilter === 'discount' && styles.filterChipActive]}
             onPress={() => setSelectedFilter(selectedFilter === 'discount' ? null : 'discount')}
           >
-            <Ionicons name="pricetag" size={16} color={selectedFilter === 'discount' ? '#e03131' : '#495057'} />
+            <Ionicons name="pricetag" size={16} color={selectedFilter === 'discount' ? '#22c55e' : '#495057'} />
             <Text style={[styles.filterChipText, selectedFilter === 'discount' && styles.filterChipTextActive]}>
               할인율 높은순
             </Text>
@@ -405,7 +405,7 @@ function MobileMapScreen() {
             style={[styles.filterChip, showFilters && styles.filterChipActive]}
             onPress={() => setShowFilters(!showFilters)}
           >
-            <Ionicons name="options" size={16} color={showFilters ? '#e03131' : '#495057'} />
+            <Ionicons name="options" size={16} color={showFilters ? '#22c55e' : '#495057'} />
             <Text style={[styles.filterChipText, showFilters && styles.filterChipTextActive]}>
               필터
             </Text>
@@ -479,67 +479,26 @@ function MobileMapScreen() {
           </View>
         ) : (
           <>
-            <MapView
-              ref={mapRef}
+            <NaverMap
               style={styles.map}
-              initialRegion={{
-                latitude: 37.5665,
-                longitude: 126.9780,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
-              }}
-              showsUserLocation={locationPermission}
-              showsMyLocationButton={false}
-              showsCompass={true}
-              showsScale={true}
-              showsTraffic={false}
-              onMapReady={() => {
-                if (currentLocation) {
-                  mapRef.current?.animateToRegion({
-                    latitude: currentLocation.coords.latitude,
-                    longitude: currentLocation.coords.longitude,
-                    latitudeDelta: 0.01,
-                    longitudeDelta: 0.01,
-                  });
+              markers={deals.map(deal => ({
+                id: deal.id,
+                latitude: deal.location.latitude,
+                longitude: deal.location.longitude,
+                title: deal.title,
+                description: deal.description,
+                category: deal.category,
+                discountRate: deal.discountRate,
+                isNew: deal.isNew || false,
+              }))}
+              onMarkerPress={(markerId) => {
+                const deal = deals.find(d => d.id === markerId);
+                if (deal) {
+                  handleMarkerPress(deal);
                 }
               }}
-              onUserLocationChange={(event) => {
-                if (event.nativeEvent.coordinate) {
-                  const { latitude, longitude } = event.nativeEvent.coordinate;
-                  setCurrentLocation({
-                    coords: { latitude, longitude, altitude: null, accuracy: null, altitudeAccuracy: null, heading: null, speed: null },
-                    timestamp: Date.now()
-                  });
-                }
-              }}
-            >
-              {deals.map((deal) => (
-                <Marker
-                  key={deal.id}
-                  coordinate={{
-                    latitude: deal.location.latitude,
-                    longitude: deal.location.longitude,
-                  }}
-                  onPress={() => handleMarkerPress(deal)}
-                >
-                  <View style={[
-                    styles.customMarker,
-                    { backgroundColor: deal.isNew ? '#e03131' : '#ffffff' }
-                  ]}>
-                    <Ionicons 
-                      name={getMarkerIcon(deal.category)} 
-                      size={16} 
-                      color={deal.isNew ? '#ffffff' : '#e03131'} 
-                    />
-                    {deal.discountRate >= 50 && (
-                      <View style={styles.markerBadge}>
-                        <Text style={styles.markerBadgeText}>{deal.discountRate}%</Text>
-                      </View>
-                    )}
-                  </View>
-                </Marker>
-              ))}
-            </MapView>
+              currentLocation={currentLocation}
+            />
 
             {/* 현재 위치 버튼 */}
             <TouchableOpacity 
@@ -616,7 +575,7 @@ function MobileMapScreen() {
                 
                 <View style={styles.infoRow}>
                   <TouchableOpacity style={styles.favoriteButton}>
-                    <Ionicons name="heart-outline" size={20} color="#ef4444" />
+                    <Ionicons name="heart-outline" size={20} color="#22c55e" />
                     <Text style={styles.favoriteButtonText}>찜하기</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.detailButton}>
@@ -644,7 +603,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   actionButton: {
-    backgroundColor: '#e03131',
+    backgroundColor: '#22c55e',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -666,7 +625,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   iconButton: {
-    backgroundColor: '#e03131',
+    backgroundColor: '#22c55e',
     borderRadius: 16,
     padding: 12,
     shadowColor: '#000',
@@ -703,13 +662,13 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     borderWidth: 2,
-    borderColor: '#e03131',
+    borderColor: '#22c55e',
   },
   markerBadge: {
     position: 'absolute',
     top: -8,
     right: -8,
-    backgroundColor: '#e03131',
+    backgroundColor: '#22c55e',
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -735,8 +694,8 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
   },
   filterChipActive: {
-    backgroundColor: '#fff5f5',
-    borderColor: '#e03131',
+    backgroundColor: '#f0fdf4',
+    borderColor: '#22c55e',
   },
   filterChipText: {
     fontSize: 14,
@@ -745,7 +704,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   filterChipTextActive: {
-    color: '#e03131',
+    color: '#22c55e',
   },
   // 검색 관련 스타일
   searchContainer: {
@@ -1001,8 +960,8 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   discountBadge: {
-    backgroundColor: '#e7f5ff',
-    color: '#228be6',
+    backgroundColor: '#dcfce7',
+    color: '#22c55e',
     fontSize: 13,
     fontWeight: '600',
     paddingHorizontal: 10,
@@ -1025,7 +984,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 15,
-    color: '#228be6',
+    color: '#22c55e',
     fontWeight: '600',
     marginBottom: 8,
   },
@@ -1067,7 +1026,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   detailButton: {
-    backgroundColor: '#228be6',
+    backgroundColor: '#22c55e',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 16,

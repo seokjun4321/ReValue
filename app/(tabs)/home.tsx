@@ -236,37 +236,45 @@ export default function Home() {
 
   return (
     <View style={styles.container}>
-      {/* 헤더 */}
+      {/* 🥕 당근마켓 스타일 헤더 */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>ReValue</Text>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#e03131" />
-            <View style={styles.notificationBadge} />
-          </TouchableOpacity>
+          <View style={styles.headerLeft}>
+            <Text style={styles.headerTitle}>ReValue</Text>
+            <Text style={styles.headerLocation}>📍 우리동네</Text>
+          </View>
+          <View style={styles.headerRight}>
+            <TouchableOpacity style={styles.searchButton} onPress={openSearchModal}>
+              <Ionicons name="search" size={24} color="#22c55e" />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.notificationButton}>
+              <Ionicons name="notifications-outline" size={24} color="#22c55e" />
+              <View style={styles.notificationBadge} />
+            </TouchableOpacity>
+          </View>
         </View>
-        <Text style={styles.subTitle}>환경을 생각하는 똑똑한 소비</Text>
+        <Text style={styles.subTitle}>환경을 생각하는 똑똑한 소비 🌱</Text>
       </View>
 
       <ScrollView 
         style={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#e03131" />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#22c55e" />
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* 환영 섹션 */}
+        {/* 🥕 당근마켓 스타일 환영 섹션 */}
         <View style={styles.welcomeSection}>
-          <View style={styles.welcomeContent}>
+          <View style={styles.welcomeCard}>
             <Text style={styles.welcomeTitle}>
-              {auth.currentUser ? `${auth.currentUser.displayName || '떨이 헌터'}님,` : '안녕하세요!'} 
+              {auth.currentUser ? `${auth.currentUser.displayName || '떨이 헌터'}님 안녕하세요! 👋` : '안녕하세요! 👋'} 
             </Text>
-            <Text style={styles.welcomeText}>오늘은 어떤 가치를 발견하시겠어요?</Text>
+            <Text style={styles.welcomeText}>우리동네 착한 가격을 찾아보세요</Text>
+            <TouchableOpacity style={styles.actionButton} onPress={openSearchModal}>
+              <Ionicons name="search" size={20} color="#ffffff" />
+              <Text style={styles.actionButtonText}>떨이 검색하기</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.actionButton} onPress={openSearchModal}>
-            <Ionicons name="search" size={20} color="#e03131" />
-            <Text style={styles.actionButtonText}>검색하기</Text>
-          </TouchableOpacity>
         </View>
 
         {/* 에코 임팩트 섹션 */}
@@ -278,7 +286,7 @@ export default function Home() {
             </View>
             <TouchableOpacity style={styles.ecoHistoryButton}>
               <Text style={styles.ecoHistoryText}>전체보기</Text>
-              <Ionicons name="chevron-forward" size={16} color="#2f9e44" />
+              <Ionicons name="chevron-forward" size={16} color="#22c55e" />
             </TouchableOpacity>
           </View>
 
@@ -288,8 +296,8 @@ export default function Home() {
             style={styles.ecoStatsScroll}
           >
             <View style={styles.ecoStatCard}>
-              <View style={[styles.ecoIcon, { backgroundColor: '#ebfbee' }]}>
-                <Ionicons name="leaf" size={24} color="#2f9e44" />
+              <View style={[styles.ecoIcon, { backgroundColor: '#dcfce7' }]}>
+                <Ionicons name="leaf" size={24} color="#22c55e" />
               </View>
               <Text style={styles.ecoStatValue}>
                 {(userStats?.ecoImpact?.co2Reduced || 0).toFixed(1)}kg
@@ -332,8 +340,8 @@ export default function Home() {
 
           {/* 나무 심기 프로젝트 */}
           <TouchableOpacity style={styles.treeProjectCard}>
-            <View style={[styles.treeProjectImage, { backgroundColor: '#ebfbee' }]}>
-              <Ionicons name="leaf" size={48} color="#2f9e44" />
+            <View style={[styles.treeProjectImage, { backgroundColor: '#dcfce7' }]}>
+              <Ionicons name="leaf" size={48} color="#22c55e" />
             </View>
             <View style={styles.treeProjectContent}>
               <View style={styles.treeProjectHeader}>
@@ -375,7 +383,7 @@ export default function Home() {
                 </View>
                 <Text style={styles.dealStore}>{deal.storeName}</Text>
                 <View style={styles.countdownContainer}>
-                  <Ionicons name="time" size={20} color="#e03131" />
+                  <Ionicons name="time" size={20} color="#22c55e" />
                   <Text style={styles.countdownText}>
                     {formatTimeUntilExpiry(deal.expiryDate)} • 남은 수량 {deal.remainingQuantity}개
                   </Text>
@@ -646,9 +654,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingTop: 50,
     paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#fff5f5',
+    paddingBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   headerTop: {
     flexDirection: 'row',
@@ -656,10 +667,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '700',
-    color: '#e03131',
+    color: '#22c55e',
+    marginRight: 12,
+  },
+  headerLocation: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  searchButton: {
+    padding: 8,
+    marginRight: 8,
   },
   notificationButton: {
     position: 'relative',
@@ -672,60 +701,57 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#e03131',
+    backgroundColor: '#22c55e',
   },
   subTitle: {
     fontSize: 15,
-    color: '#495057',
+    color: '#64748b',
     fontWeight: '500',
   },
   content: {
     flex: 1,
   },
   welcomeSection: {
-    backgroundColor: '#fff5f5',
-    margin: 20,
-    borderRadius: 24,
-    padding: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
-  welcomeContent: {
-    flex: 1,
+  welcomeCard: {
+    backgroundColor: '#22c55e',
+    borderRadius: 20,
+    padding: 24,
+    shadowColor: '#22c55e',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   welcomeTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
-    color: '#e03131',
-    marginBottom: 6,
+    color: '#ffffff',
+    marginBottom: 8,
   },
   welcomeText: {
-    fontSize: 15,
-    color: '#495057',
+    fontSize: 16,
+    color: '#dcfce7',
     fontWeight: '500',
+    marginBottom: 20,
   },
   actionButton: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 14,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   actionButtonText: {
-    color: '#e03131',
-    fontSize: 15,
+    color: '#ffffff',
+    fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
   },
@@ -752,21 +778,21 @@ const styles = StyleSheet.create({
   },
   ecoPoints: {
     fontSize: 18,
-    color: '#e03131',
+    color: '#22c55e',
     fontWeight: '600',
     marginLeft: 8,
   },
   ecoHistoryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff5f5',
+    backgroundColor: '#dcfce7',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 12,
   },
   ecoHistoryText: {
     fontSize: 14,
-    color: '#e03131',
+    color: '#22c55e',
     fontWeight: '600',
     marginRight: 4,
   },
@@ -813,12 +839,12 @@ const styles = StyleSheet.create({
   },
 
   treeProjectCard: {
-    backgroundColor: '#fff5f5',
+    backgroundColor: '#f0fdf4',
     margin: 20,
     marginTop: 0,
     borderRadius: 24,
     overflow: 'hidden',
-    shadowColor: '#000',
+    shadowColor: '#22c55e',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -849,7 +875,7 @@ const styles = StyleSheet.create({
   treeProjectProgress: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e03131',
+    color: '#22c55e',
   },
   treeProjectDesc: {
     fontSize: 15,
@@ -865,26 +891,8 @@ const styles = StyleSheet.create({
   },
   treeProgressFill: {
     height: '100%',
-    backgroundColor: '#e03131',
+    backgroundColor: '#22c55e',
     borderRadius: 6,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  header: {
-    backgroundColor: '#ffffff',
-    paddingTop: 50,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#fff5f5',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#e03131',
-    marginBottom: 4,
   },
   subTitle: {
     fontSize: 15,
@@ -947,7 +955,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   trendingHeader: {
-    backgroundColor: '#fff5f5',
+    backgroundColor: '#f0fdf4',
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -956,7 +964,7 @@ const styles = StyleSheet.create({
   trendingTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#e03131',
+    color: '#22c55e',
   },
   trendingContent: {
     padding: 20,
@@ -965,12 +973,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
-    backgroundColor: '#fff5f5',
+    backgroundColor: '#f0fdf4',
     padding: 12,
     borderRadius: 16,
   },
   countdownText: {
-    color: '#e03131',
+    color: '#22c55e',
     fontSize: 15,
     fontWeight: '600',
     marginLeft: 8,
@@ -996,7 +1004,7 @@ const styles = StyleSheet.create({
     padding: 3,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#e03131',
+    borderColor: '#22c55e',
   },
   storyTitle: {
     fontSize: 14,
@@ -1026,53 +1034,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginRight: 12,
   },
-  welcomeSection: {
-    backgroundColor: '#fff5f5',
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  welcomeContent: {
-    flex: 1,
-  },
-  welcomeTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#e03131',
-    marginBottom: 6,
-  },
-  welcomeText: {
-    fontSize: 15,
-    color: '#495057',
-    fontWeight: '500',
-  },
-  actionButton: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  actionButtonText: {
-    color: '#e03131',
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
   categorySection: {
     marginBottom: 24,
   },
@@ -1101,7 +1062,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   categoryButtonActive: {
-    backgroundColor: '#fff5f5',
+    backgroundColor: '#f0fdf4',
   },
   categoryButtonText: {
     fontSize: 13,
@@ -1110,7 +1071,7 @@ const styles = StyleSheet.create({
     color: '#495057',
   },
   categoryButtonTextActive: {
-    color: '#e03131',
+    color: '#22c55e',
   },
   todaysDealsSection: {
     backgroundColor: '#ffffff',
@@ -1178,7 +1139,7 @@ const styles = StyleSheet.create({
   },
   dealImagePlaceholder: {
     height: 160,
-    backgroundColor: '#fff5f5',
+    backgroundColor: '#f0fdf4',
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1208,7 +1169,7 @@ const styles = StyleSheet.create({
   dealPrice: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#e03131',
+    color: '#22c55e',
     marginRight: 8,
   },
   dealOriginalPrice: {
@@ -1220,7 +1181,7 @@ const styles = StyleSheet.create({
   dealDiscount: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#e03131',
+    color: '#22c55e',
     marginBottom: 12,
   },
   dealDistance: {
@@ -1231,7 +1192,7 @@ const styles = StyleSheet.create({
   },
   dealTime: {
     fontSize: 14,
-    color: '#e03131',
+    color: '#22c55e',
     fontWeight: '600',
   },
   recentSection: {

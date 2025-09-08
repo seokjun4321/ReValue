@@ -12,7 +12,21 @@ import {
   Timestamp,
   limit 
 } from 'firebase/firestore';
-import { Deal, Post, Order, Store } from './types';
+import { Deal, Order, Store } from './types';
+
+// 사용자 프로필 생성/업데이트
+export const createOrUpdateUserProfile = async (userId: string, userData: any) => {
+  try {
+    const userRef = doc(db, 'users', userId);
+    await setDoc(userRef, {
+      ...userData,
+      updatedAt: Timestamp.now()
+    }, { merge: true });
+  } catch (error) {
+    console.error('사용자 프로필 업데이트 실패:', error);
+    throw error;
+  }
+};
 
 // 판매자 매장 정보 가져오기
 export const getUserStore = async (userId: string): Promise<Store | null> => {
@@ -36,49 +50,7 @@ export const getUserStore = async (userId: string): Promise<Store | null> => {
   }
 };
 
-// 게시글 작성
-export const createPost = async (post: Omit<Post, 'id' | 'createdAt' | 'likes' | 'comments' | 'shares'>) => {
-  try {
-    const postsRef = collection(db, 'posts');
-    const newPost = {
-      ...post,
-      createdAt: Timestamp.now(),
-      likes: 0,
-      comments: 0,
-      shares: 0,
-    };
-    
-    const docRef = await addDoc(postsRef, newPost);
-    return { id: docRef.id, ...newPost };
-  } catch (error) {
-    console.error('게시글 작성 실패:', error);
-    throw error;
-  }
-};
 
-// 게시글 불러오기
-export const getPosts = async (category: Post['category'], limitCount: number = 10) => {
-  try {
-    const postsRef = collection(db, 'posts');
-    const q = query(
-      postsRef,
-      where('category', '==', category),
-      limit(limitCount)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    const posts = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-      ...doc.data()
-    })) as Post[];
-    
-    // 클라이언트 사이드에서 정렬
-    return posts.sort((a, b) => b.createdAt.toMillis() - a.createdAt.toMillis());
-  } catch (error) {
-    console.error('게시글 로드 실패:', error);
-    throw error;
-  }
-};
 
 // 떨이 검색
 export const searchDeals = async (term: string, limitCount: number = 20) => {

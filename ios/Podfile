@@ -11,18 +11,13 @@ platform :ios, podfile_properties['ios.deploymentTarget'] || '15.1'
 install! 'cocoapods',
   :deterministic_uuids => false
 
-project 'revalue.xcodeproj'
-
 prepare_react_native_project!
-
-# React Native Maps dependencies
-rn_maps_path = '../node_modules/react-native-maps'
-pod 'react-native-google-maps', :path => rn_maps_path
-pod 'GoogleMaps'
-pod 'Google-Maps-iOS-Utils'
 
 target 'revalue' do
   use_expo_modules!
+  
+  # 네이버 지도 SDK
+  pod 'NMapsMap'
 
   if ENV['EXPO_USE_COMMUNITY_AUTOLINKING'] == '1'
     config_command = ['node', '-e', "process.argv=['', '', 'config'];require('@react-native-community/cli').run()"];

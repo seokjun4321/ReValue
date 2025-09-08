@@ -569,56 +569,7 @@ export interface Badge {
   tier: 'bronze' | 'silver' | 'gold' | 'platinum';
 }
 
-// 커뮤니티 게시글
-export interface Post {
-  id: string;
-  authorId: string;
-  category: 'tips' | 'restaurants' | 'eco' | 'general';
-  title: string;
-  content: string;
-  images: string[];
-  tags: string[];
-  
-  // 위치 정보 (맛집 정보의 경우)
-  location?: {
-    name: string;
-    address: string;
-    coordinates: {
-      latitude: number;
-      longitude: number;
-    };
-  };
-  
-  // 상호작용
-  likes: number;
-  comments: number;
-  shares: number;
-  
-  // 에코 실천 관련
-  ecoImpact?: {
-    category: 'waste' | 'energy' | 'water' | 'etc';
-    savedAmount: number;  // 절약한 양
-    unit: string;        // 단위 (kg, L 등)
-  };
-  
-  createdAt: Date;
-  updatedAt: Date;
-}
 
-// 댓글
-export interface Comment {
-  id: string;
-  postId: string;
-  authorId: string;
-  content: string;
-  likes: number;
-  createdAt: Date;
-  updatedAt: Date;
-  
-  // 대댓글
-  parentId?: string;
-  replies?: number;
-}
 
 // 카테고리 타입
 export type CategoryType = 'food' | 'clothing' | 'household' | 'electronics' | 'books' | 'sports' | 'beauty' | 'other';

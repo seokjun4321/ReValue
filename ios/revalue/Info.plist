@@ -33,12 +33,6 @@
           <string>com.revalue.app</string>
         </array>
       </dict>
-      <dict>
-        <key>CFBundleURLSchemes</key>
-        <array>
-          <string>com.googleusercontent.apps.816141764936-your-ios-client-id</string>
-        </array>
-      </dict>
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>
@@ -95,5 +89,7 @@
     <string>Automatic</string>
     <key>UIViewControllerBasedStatusBarAppearance</key>
     <false/>
+    <key>NMFNcpKeyId</key>
+    <string>xei5ukp7c8</string>
   </dict>
 </plist>

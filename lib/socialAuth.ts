@@ -18,13 +18,8 @@ let GoogleSignin: any = null;
 let AppleAuthentication: any = null;
 let KakaoLogin: any = null;
 
-if (Platform.OS !== 'web') {
-  try {
-    GoogleSignin = require('@react-native-google-signin/google-signin').GoogleSignin;
-  } catch (error) {
-    console.warn('Google Sign-In module not available');
-  }
-}
+// Google Sign-In 모듈은 제거됨
+console.warn('Google Sign-In module not available - removed from project');
 
 if (Platform.OS === 'ios') {
   try {
@@ -57,6 +52,12 @@ export const configureGoogleSignIn = () => {
  */
 export const signInWithGoogle = async () => {
   try {
+    // Google Sign-In이 제거되었으므로 오류 반환
+    return { 
+      success: false, 
+      error: 'Google 로그인은 현재 사용할 수 없습니다. 다른 로그인 방법을 사용해주세요.' 
+    };
+    
     if (Platform.OS === 'web') {
       // 웹에서는 Firebase의 팝업 방식 사용
       const provider = new GoogleAuthProvider();
