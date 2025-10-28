@@ -26,6 +26,7 @@ import { Deal, Order, CategoryType, CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_I
 import { auth } from '../../firebase';
 import "../global.css";
 import PersonalizedFeed from '../../components/PersonalizedFeed';
+import { dummyFoodDeals, getDummyDealsByCategory, getPopularDummyDeals, getExpiringDummyDeals } from '../../lib/dummyData';
 
 export default function Home() {
   const router = useRouter();
@@ -56,9 +57,10 @@ export default function Home() {
         getExpiringDeals(5)
       ]);
       
-      setTodaysDeals(deals);
-      setPopularDeals(popular);
-      setExpiringDeals(expiring);
+      // Firestore 데이터가 없으면 더미 데이터 사용
+      setTodaysDeals(deals.length > 0 ? deals : dummyFoodDeals as Deal[]);
+      setPopularDeals(popular.length > 0 ? popular : getPopularDummyDeals(5) as Deal[]);
+      setExpiringDeals(expiring.length > 0 ? expiring : getExpiringDummyDeals(5) as Deal[]);
 
       // 사용자가 로그인되어 있으면 주문 내역과 통계 로드
       const user = auth.currentUser;
@@ -73,6 +75,10 @@ export default function Home() {
       }
     } catch (error) {
       console.error('데이터 로드 실패:', error);
+      // 에러 발생 시에도 더미 데이터 표시
+      setTodaysDeals(dummyFoodDeals as Deal[]);
+      setPopularDeals(getPopularDummyDeals(5) as Deal[]);
+      setExpiringDeals(getExpiringDummyDeals(5) as Deal[]);
     } finally {
       setLoading(false);
     }
@@ -83,9 +89,12 @@ export default function Home() {
     try {
       setLoading(true);
       const deals = await getDealsByCategory(category, 10);
-      setTodaysDeals(deals);
+      // Firestore 데이터가 없으면 더미 데이터 사용
+      setTodaysDeals(deals.length > 0 ? deals : getDummyDealsByCategory(category) as Deal[]);
     } catch (error) {
       console.error('카테고리 데이터 로드 실패:', error);
+      // 에러 발생 시에도 더미 데이터 표시
+      setTodaysDeals(getDummyDealsByCategory(category) as Deal[]);
     } finally {
       setLoading(false);
     }
@@ -431,33 +440,36 @@ export default function Home() {
                 ]}
                 onPress={() => handleCategorySelect('all')}
               >
-                <Ionicons name="apps" size={24} color={selectedCategory === 'all' ? '#228be6' : '#4a5568'} />
+                <Ionicons name="apps" size={24} color={selectedCategory === 'all' ? '#22c55e' : '#8b95a1'} />
                 <Text style={[
                   styles.categoryButtonText,
                   selectedCategory === 'all' && styles.categoryButtonTextActive
                 ]}>전체</Text>
               </TouchableOpacity>
 
-              {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                <TouchableOpacity
-                  key={key}
-                  style={[
-                    styles.categoryButton,
-                    selectedCategory === key && styles.categoryButtonActive
-                  ]}
-                  onPress={() => handleCategorySelect(key as CategoryType)}
-                >
-                  <Ionicons 
-                    name={CATEGORY_ICONS[key as CategoryType] as any} 
-                    size={24} 
-                    color={selectedCategory === key ? '#e03131' : '#495057'} 
-                  />
-                  <Text style={[
-                    styles.categoryButtonText,
-                    selectedCategory === key && styles.categoryButtonTextActive
-                  ]}>{label}</Text>
-                </TouchableOpacity>
-              ))}
+              {Object.entries(CATEGORY_LABELS).map(([key, label]) => {
+                const categoryColor = CATEGORY_COLORS[key as CategoryType];
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[
+                      styles.categoryButton,
+                      selectedCategory === key && { ...styles.categoryButtonActive, backgroundColor: categoryColor + '20' }
+                    ]}
+                    onPress={() => handleCategorySelect(key as CategoryType)}
+                  >
+                    <Ionicons 
+                      name={CATEGORY_ICONS[key as CategoryType] as any} 
+                      size={24} 
+                      color={selectedCategory === key ? categoryColor : '#8b95a1'} 
+                    />
+                    <Text style={[
+                      styles.categoryButtonText,
+                      selectedCategory === key && { ...styles.categoryButtonTextActive, color: categoryColor }
+                    ]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </ScrollView>
         </View>

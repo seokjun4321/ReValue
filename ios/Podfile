@@ -63,5 +63,21 @@ target 'revalue' do
         end
       end
     end
+
+    # Swift 6 언어 모드 비활성화 (Swift 5로 강제)
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['SWIFT_VERSION'] = '5.0'
+        config.build_settings['SWIFT_EMIT_LOC_STRINGS'] = 'NO'
+        
+        # 시뮬레이터용 아키텍처 설정 (libdav1d 어셈블리 오류 해결)
+        config.build_settings["EXCLUDED_ARCHS[sdk=iphonesimulator*]"] = "i386"
+        
+        # libdav1d 관련 문제 해결
+        if target.name == 'libdav1d'
+          config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
+        end
+      end
+    end
   end
 end

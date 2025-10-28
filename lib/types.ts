@@ -571,12 +571,47 @@ export interface Badge {
 
 
 
-// 카테고리 타입
-export type CategoryType = 'food' | 'clothing' | 'household' | 'electronics' | 'books' | 'sports' | 'beauty' | 'other';
+// 카테고리 타입 - 음식 카테고리 대폭 확장
+export type CategoryType = 
+  // 음식 메인 카테고리
+  | 'food' 
+  // 음식 세부 카테고리
+  | 'bakery'      // 빵/베이커리
+  | 'snacks'      // 과자/간식
+  | 'dairy'       // 유제품
+  | 'frozen'      // 냉동식품
+  | 'instant'     // 즉석식품/간편식
+  | 'beverage'    // 음료
+  | 'fruit'       // 과일
+  | 'vegetable'   // 채소
+  | 'meat'        // 육류
+  | 'seafood'     // 수산물
+  | 'deli'        // 델리/반찬
+  | 'seasoning'   // 조미료/양념
+  // 기타 카테고리
+  | 'clothing' 
+  | 'household' 
+  | 'electronics' 
+  | 'books' 
+  | 'sports' 
+  | 'beauty' 
+  | 'other';
 
 // 카테고리 한글 라벨
 export const CATEGORY_LABELS: Record<CategoryType, string> = {
-  food: '음식',
+  food: '전체 음식',
+  bakery: '빵/베이커리',
+  snacks: '과자/간식',
+  dairy: '유제품',
+  frozen: '냉동식품',
+  instant: '즉석/간편식',
+  beverage: '음료',
+  fruit: '과일',
+  vegetable: '채소',
+  meat: '육류',
+  seafood: '수산물',
+  deli: '델리/반찬',
+  seasoning: '조미료/양념',
   clothing: '의류',
   household: '생활용품',
   electronics: '전자제품',
@@ -589,6 +624,18 @@ export const CATEGORY_LABELS: Record<CategoryType, string> = {
 // 카테고리별 색상
 export const CATEGORY_COLORS: Record<CategoryType, string> = {
   food: '#ef4444',      // 빨강
+  bakery: '#ffa94d',    // 오렌지
+  snacks: '#ffd43b',    // 노랑
+  dairy: '#a5d8ff',     // 연한 파랑
+  frozen: '#91a7ff',    // 보라빛 파랑
+  instant: '#ff8787',   // 분홍
+  beverage: '#4dabf7',  // 파랑
+  fruit: '#ff6b6b',     // 빨강
+  vegetable: '#51cf66', // 녹색
+  meat: '#e64980',      // 짙은 분홍
+  seafood: '#339af0',   // 짙은 파랑
+  deli: '#ff922b',      // 오렌지
+  seasoning: '#845ef7', // 보라
   clothing: '#3b82f6',  // 파랑
   household: '#8b5cf6', // 보라
   electronics: '#06b6d4', // 청록
@@ -601,6 +648,18 @@ export const CATEGORY_COLORS: Record<CategoryType, string> = {
 // 카테고리별 아이콘
 export const CATEGORY_ICONS: Record<CategoryType, string> = {
   food: 'restaurant',
+  bakery: 'cafe',
+  snacks: 'ice-cream',
+  dairy: 'water',
+  frozen: 'snow',
+  instant: 'fast-food',
+  beverage: 'wine',
+  fruit: 'leaf',
+  vegetable: 'nutrition',
+  meat: 'fish',
+  seafood: 'fish',
+  deli: 'pizza',
+  seasoning: 'flask',
   clothing: 'shirt',
   household: 'home',
   electronics: 'phone-portrait',

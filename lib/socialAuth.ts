@@ -8,8 +8,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../firebase';
 import { createOrUpdateUserProfile } from './firestore';
-import { Platform, Alert } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { Platform, Alert, Linking } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as Crypto from 'expo-crypto';
 
@@ -31,9 +30,6 @@ if (Platform.OS === 'ios') {
 
 // 카카오 로그인은 현재 웹 기반 OAuth로만 지원
 // Android/iOS 네이티브 SDK는 추후 구현 예정
-
-// WebBrowser 설정 (OAuth 리디렉트용)
-WebBrowser.maybeCompleteAuthSession();
 
 // Google 소셜 로그인 설정
 export const configureGoogleSignIn = () => {

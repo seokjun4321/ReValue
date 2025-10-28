@@ -53,10 +53,19 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="ranking"
+        options={{
+          title: '랭킹',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trophy" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="mapscreen"
         options={{
           title: '지도',
-          tabBarIcon: ({ color, size }) => (
+          tabBarIcon: ({ color, size}) => (
             <Ionicons name="map" size={size} color={color} />
           ),
         }}

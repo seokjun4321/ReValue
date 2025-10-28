@@ -12,7 +12,6 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as Speech from 'expo-speech';
 
 import { searchDeals } from '../lib/firestore';
 import { Deal } from '../lib/types';
@@ -36,42 +35,13 @@ export default function SmartSearch({ onSelect }: SmartSearchProps) {
     '1km 이내', '인기매장'
   ];
 
-  // 음성 검색 시작
+  // 음성 검색 시작 (현재 비활성화됨)
   const startVoiceSearch = async () => {
-    try {
-      setIsListening(true);
-      const isAvailable = await Speech.isAvailableAsync();
-      
-      if (!isAvailable) {
-        Alert.alert('알림', '음성 검색을 사용할 수 없습니다.');
-        setIsListening(false);
-        return;
-      }
-
-      await Speech.speak('무엇을 찾으시나요?', {
-        language: 'ko-KR',
-        pitch: 1,
-        rate: 0.9,
-        onDone: () => {
-          // 실제 앱에서는 여기에 음성 인식 API를 연동해야 합니다
-          // 현재는 데모 목적으로 타이머 사용
-          setTimeout(() => {
-            setIsListening(false);
-            setSearchTerm('근처 맛집');
-            handleSearch('근처 맛집');
-          }, 2000);
-        },
-        onError: (error) => {
-          console.error('음성 출력 오류:', error);
-          setIsListening(false);
-          Alert.alert('오류', '음성 검색 중 문제가 발생했습니다.');
-        }
-      });
-    } catch (error) {
-      console.error('음성 검색 오류:', error);
-      setIsListening(false);
-      Alert.alert('오류', '음성 검색을 시작할 수 없습니다.');
-    }
+    Alert.alert(
+      '음성 검색',
+      '음성 검색 기능은 현재 개발 중입니다.',
+      [{ text: '확인' }]
+    );
   };
 
   // 검색 실행
