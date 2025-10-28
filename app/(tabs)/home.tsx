@@ -25,7 +25,6 @@ import {
 import { Deal, Order, CategoryType, CATEGORY_LABELS, CATEGORY_COLORS, CATEGORY_ICONS } from '../../lib/types';
 import { auth } from '../../firebase';
 import "../global.css";
-import PersonalizedFeed from '../../components/PersonalizedFeed';
 import { dummyFoodDeals, getDummyDealsByCategory, getPopularDummyDeals, getExpiringDummyDeals } from '../../lib/dummyData';
 
 export default function Home() {
@@ -367,67 +366,6 @@ export default function Home() {
           </TouchableOpacity>
         </View>
 
-        {/* 개인화된 추천 섹션 */}
-        {auth.currentUser && (
-          <PersonalizedFeed userId={auth.currentUser.uid} />
-        )}
-
-        {/* 실시간 인기 섹션 */}
-        <View style={styles.trendingSection}>
-          <Text style={styles.personalTitle}>🔥 실시간 인기 떨이</Text>
-          {popularDeals.slice(0, 3).map((deal: Deal) => (
-            <TouchableOpacity
-              key={deal.id}
-              style={styles.trendingCard}
-              onPress={() => router.push(`/deal/${deal.id}`)}
-            >
-              <View style={styles.trendingHeader}>
-                <Text style={styles.trendingTitle}>{deal.title}</Text>
-                <Text style={styles.dealDiscount}>{deal.discountRate}% 할인</Text>
-              </View>
-              <View style={styles.trendingContent}>
-                <View style={styles.dealPriceContainer}>
-                  <Text style={styles.dealPrice}>{deal.discountedPrice.toLocaleString()}원</Text>
-                  <Text style={styles.dealOriginalPrice}>{deal.originalPrice.toLocaleString()}원</Text>
-                </View>
-                <Text style={styles.dealStore}>{deal.storeName}</Text>
-                <View style={styles.countdownContainer}>
-                  <Ionicons name="time" size={20} color="#22c55e" />
-                  <Text style={styles.countdownText}>
-                    {formatTimeUntilExpiry(deal.expiryDate)} • 남은 수량 {deal.remainingQuantity}개
-                  </Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* 스토리 섹션 */}
-        <View style={styles.storySection}>
-          <Text style={styles.personalTitle}>✨ 오늘의 스토리</Text>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.storyScroll}
-          >
-            {popularDeals.map((deal: Deal) => (
-              <TouchableOpacity
-                key={deal.id}
-                style={styles.storyCard}
-                onPress={() => router.push(`/deal/${deal.id}`)}
-              >
-                <View style={styles.storyImageRing}>
-                  <View style={[styles.storyImage, { backgroundColor: '#fff5f5', alignItems: 'center', justifyContent: 'center' }]}>
-                    <Ionicons name="image" size={40} color="#ffa8a8" />
-                  </View>
-                </View>
-                <Text style={styles.storyTitle} numberOfLines={1}>{deal.storeName}</Text>
-                <Text style={styles.storySubtitle}>신선도 인증</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
         {/* 카테고리 섹션 */}
         <View style={styles.categorySection}>
           <Text style={styles.sectionTitle}>카테고리</Text>
@@ -500,15 +438,17 @@ export default function Home() {
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View style={styles.dealsContainer}>
   {todaysDeals.map((deal) => (
-    // TouchableOpacity에 onPress 이벤트 추가
     <TouchableOpacity 
       key={deal.id} 
       style={styles.dealCard}
-      onPress={() => router.push(`/deal/${deal.id}`)} // 이 부분을 추가!
+      onPress={() => router.push(`/deal/${deal.id}`)}
     >
-                        <View style={styles.dealImagePlaceholder}>
-                    <Ionicons name="image" size={40} color="#dcfce7" />
-                  </View>
+      <View style={styles.dealImagePlaceholder}>
+        <Ionicons name="restaurant" size={48} color="#22c55e" />
+        <View style={styles.dealDiscountBadge}>
+          <Text style={styles.dealDiscountBadgeText}>{deal.discountRate}%</Text>
+        </View>
+      </View>
       <View style={styles.dealInfo}>
         <Text style={styles.dealTitle} numberOfLines={2}>{deal.title}</Text>
         <Text style={styles.dealStore}>{deal.storeName}</Text>
@@ -516,9 +456,26 @@ export default function Home() {
           <Text style={styles.dealPrice}>{deal.discountedPrice.toLocaleString()}원</Text>
           <Text style={styles.dealOriginalPrice}>{deal.originalPrice.toLocaleString()}원</Text>
         </View>
-        <Text style={styles.dealDiscount}>{deal.discountRate}% 할인</Text>
-        <Text style={styles.dealDistance}>📍 {formatDistance(deal)}</Text>
-        <Text style={styles.dealTime}>⏰ {formatTimeUntilExpiry(deal.expiryDate)}</Text>
+        <View style={styles.dealMetaContainer}>
+          <View style={styles.dealMetaItem}>
+            <Ionicons name="location" size={14} color="#8b95a1" />
+            <Text style={styles.dealMetaText}>{formatDistance(deal)}</Text>
+          </View>
+          <View style={styles.dealMetaItem}>
+            <Ionicons name="time" size={14} color="#22c55e" />
+            <Text style={styles.dealMetaText}>{formatTimeUntilExpiry(deal.expiryDate)}</Text>
+          </View>
+        </View>
+        <View style={styles.dealStatsContainer}>
+          <View style={styles.dealStatItem}>
+            <Ionicons name="heart" size={14} color="#fa5252" />
+            <Text style={styles.dealStatText}>{deal.likeCount || 0}</Text>
+          </View>
+          <View style={styles.dealStatItem}>
+            <Ionicons name="eye" size={14} color="#228be6" />
+            <Text style={styles.dealStatText}>{deal.viewCount || 0}</Text>
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   ))}
@@ -911,125 +868,6 @@ const styles = StyleSheet.create({
     color: '#495057',
     fontWeight: '500',
   },
-  // 개인화된 추천 섹션
-  personalSection: {
-    marginBottom: 24,
-  },
-  personalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#191f28',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  personalScroll: {
-    paddingLeft: 20,
-  },
-  personalCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 20,
-    marginRight: 16,
-    width: 280,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  personalBadge: {
-    backgroundColor: '#fff5f5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-  },
-  personalBadgeText: {
-    color: '#e03131',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  // 실시간 인기 섹션
-  trendingSection: {
-    marginBottom: 24,
-    paddingHorizontal: 20,
-  },
-  trendingCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-    overflow: 'hidden',
-  },
-  trendingHeader: {
-    backgroundColor: '#f0fdf4',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  trendingTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#22c55e',
-  },
-  trendingContent: {
-    padding: 20,
-  },
-  countdownContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    backgroundColor: '#f0fdf4',
-    padding: 12,
-    borderRadius: 16,
-  },
-  countdownText: {
-    color: '#22c55e',
-    fontSize: 15,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  // 스토리 섹션
-  storySection: {
-    marginBottom: 24,
-  },
-  storyScroll: {
-    paddingLeft: 20,
-  },
-  storyCard: {
-    width: 140,
-    marginRight: 12,
-  },
-  storyImage: {
-    width: 140,
-    height: 140,
-    borderRadius: 20,
-    marginBottom: 8,
-  },
-  storyImageRing: {
-    padding: 3,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: '#22c55e',
-  },
-  storyTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#191f28',
-    textAlign: 'center',
-  },
-  storySubtitle: {
-    fontSize: 12,
-    color: '#868e96',
-    textAlign: 'center',
-    marginTop: 2,
-  },
   content: {
     flex: 1,
     padding: 20,
@@ -1156,6 +994,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
+    position: 'relative',
+  },
+  dealDiscountBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  dealDiscountBadgeText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
   },
   dealInfo: {
     flex: 1,
@@ -1164,48 +1017,60 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '600',
     color: '#191f28',
-    marginBottom: 8,
+    marginBottom: 6,
     lineHeight: 24,
   },
   dealStore: {
-    fontSize: 15,
-    color: '#495057',
-    marginBottom: 16,
+    fontSize: 14,
+    color: '#8b95a1',
+    marginBottom: 12,
     fontWeight: '500',
   },
   dealPriceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   dealPrice: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#22c55e',
+    color: '#191f28',
     marginRight: 8,
   },
   dealOriginalPrice: {
     fontSize: 15,
-    color: '#868e96',
+    color: '#8b95a1',
     textDecorationLine: 'line-through',
     fontWeight: '500',
   },
-  dealDiscount: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#22c55e',
+  dealMetaContainer: {
+    flexDirection: 'row',
     marginBottom: 12,
+    gap: 12,
   },
-  dealDistance: {
-    fontSize: 14,
-    color: '#495057',
-    marginBottom: 6,
+  dealMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dealMetaText: {
+    fontSize: 13,
+    color: '#8b95a1',
     fontWeight: '500',
   },
-  dealTime: {
-    fontSize: 14,
-    color: '#22c55e',
-    fontWeight: '600',
+  dealStatsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  dealStatItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  dealStatText: {
+    fontSize: 13,
+    color: '#8b95a1',
+    fontWeight: '500',
   },
   recentSection: {
     backgroundColor: '#ffffff',
